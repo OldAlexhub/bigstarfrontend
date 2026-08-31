@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { apiGet, apiPost } from "../api/client";
 
 const AuthContext = createContext(null);
 
@@ -11,11 +12,11 @@ export const AuthProvider = ({ children }) => {
 
     (async () => {
       try {
-        const res = await fetch("/api/auth/me", { credentials: "include" });
-        if (res.ok) {
-          const data = await res.json();
-          if (!cancelled) setUser(data.user);
-        }
+        const data = await apiGet("/api/auth/me");
+        if (!cancelled) setUser(data.user);
+      } catch {
+        // Not logged in yet, or the backend is unreachable — either way,
+        // stay on the login screen rather than surfacing a raw error here.
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -27,23 +28,30 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = useCallback(async (username, password) => {
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ username, password }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.message || "Login failed");
+    let data;
+    try {
+      data = await apiPost("/api/auth/login", { username, password });
+    } catch (error) {
+      // apiPost/client.js already falls back to {} on an unreadable body, so
+      // a message-less failure here means the backend didn't respond the way
+      // the app expects (unreachable, asleep, wrong URL) rather than a normal
+      // wrong-password rejection — worth telling the user that distinction.
+      throw new Error(
+        error.message && error.message !== "Request failed"
+          ? error.message
+          : "Couldn't reach the server. Check your connection and try again."
+      );
     }
     setUser(data.user);
     return data.user;
   }, []);
 
   const logout = useCallback(async () => {
-    await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
-    setUser(null);
+    try {
+      await apiPost("/api/auth/logout");
+    } finally {
+      setUser(null);
+    }
   }, []);
 
   return (

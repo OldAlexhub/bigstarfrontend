@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
-import { apiGet } from "../../api/client";
+import { apiGet, API_BASE } from "../../api/client";
 import { toISODate, todayInTimezone, addDays } from "../../utils/dates";
 import { useLatestRequest } from "../../hooks/useLatestRequest";
 
@@ -40,7 +40,7 @@ const Reporting = () => {
     setError("");
     try {
       const res = await fetch(
-        `/api/daily-issues/export?division=${selectedDivision._id}&from=${from}&to=${to}&format=${format}`,
+        `${API_BASE}/api/daily-issues/export?division=${selectedDivision._id}&from=${from}&to=${to}&format=${format}`,
         { credentials: "include" }
       );
       if (!res.ok) {

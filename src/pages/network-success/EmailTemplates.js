@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { apiGet } from "../../api/client";
+import { apiGet, API_BASE } from "../../api/client";
 
 const formatSize = (bytes) => `${Math.round((bytes / 1024) * 10) / 10} KB`;
 
@@ -21,7 +21,7 @@ const EmailTemplates = () => {
     setDownloadingId(template.id);
     try {
       const res = await fetch(
-        `/api/network-success/email-templates/${encodeURIComponent(template.id)}/download`,
+        `${API_BASE}/api/network-success/email-templates/${encodeURIComponent(template.id)}/download`,
         { credentials: "include" }
       );
       if (!res.ok) throw new Error("Could not download this template.");

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { apiGet } from "../api/client";
+import { apiGet, API_BASE } from "../api/client";
 import { toISODate, addDays, todayInTimezone } from "../utils/dates";
 import { useLatestRequest } from "../hooks/useLatestRequest";
 import TrendChart from "../components/TrendChart";
@@ -111,7 +111,7 @@ const EltReporting = () => {
     try {
       const params = new URLSearchParams({ from, to, format });
       if (selectedDivisionIds.length) params.set("divisions", selectedDivisionIds.join(","));
-      const res = await fetch(`/api/elt-reporting/export?${params.toString()}`, { credentials: "include" });
+      const res = await fetch(`${API_BASE}/api/elt-reporting/export?${params.toString()}`, { credentials: "include" });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.message || "Download failed");

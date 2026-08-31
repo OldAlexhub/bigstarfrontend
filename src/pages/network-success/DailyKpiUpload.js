@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
-import { apiGet, apiDelete } from "../../api/client";
+import { apiGet, apiDelete, API_BASE } from "../../api/client";
 import { toISODate, addDays } from "../../utils/dates";
 import { useLatestRequest } from "../../hooks/useLatestRequest";
 
@@ -67,7 +67,7 @@ const DailyKpiUpload = () => {
       formData.append("source", source);
       formData.append("file1", file1);
       if (source === "ecolane") formData.append("file2", file2);
-      const res = await fetch("/api/network-success/kpi-entries/preprocess", {
+      const res = await fetch(`${API_BASE}/api/network-success/kpi-entries/preprocess`, {
         method: "POST",
         credentials: "include",
         body: formData,
@@ -98,7 +98,7 @@ const DailyKpiUpload = () => {
     setConfirming(true);
     setPreprocessError("");
     try {
-      const res = await fetch("/api/network-success/kpi-entries/import-confirm", {
+      const res = await fetch(`${API_BASE}/api/network-success/kpi-entries/import-confirm`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
