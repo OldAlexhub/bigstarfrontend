@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { apiGet } from "../../api/client";
-import { useAuth } from "../../context/AuthContext";
 import { toISODate, todayInTimezone, addDays } from "../../utils/dates";
 
 const DAY_LABELS = {
@@ -16,7 +15,6 @@ const DAY_LABELS = {
 
 const ClientReport = () => {
   const { selectedDivision } = useOutletContext();
-  const { user } = useAuth();
   const [which, setWhich] = useState("today");
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -143,9 +141,6 @@ const ClientReport = () => {
               </tbody>
             </table>
             <p style={{ marginTop: 16 }}>Thank you,</p>
-            <p style={{ marginTop: 24, fontWeight: "bold", color: "#2f47db" }}>"Where Stars Ride"</p>
-            <p style={{ fontWeight: "bold" }}>{user?.name}</p>
-            <p>Big Star Transit, LLC</p>
           </div>
         </div>
       )}
