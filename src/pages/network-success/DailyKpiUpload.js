@@ -184,10 +184,10 @@ const DailyKpiUpload = () => {
         <div className="mb-4 flex flex-wrap items-end gap-4">
           {source === "vision" ? (
             <label className="text-sm text-slate-600">
-              Vision Para Operations (.xlsx)
+              Vision Para Operations (.xlsx or .xls)
               <input
                 type="file"
-                accept=".xlsx"
+                accept=".xlsx,.xls"
                 className="mt-1 block text-sm"
                 onChange={(e) => setFile1(e.target.files?.[0] || null)}
               />
@@ -195,19 +195,19 @@ const DailyKpiUpload = () => {
           ) : (
             <>
               <label className="text-sm text-slate-600">
-                Daily Run Productivity (.xlsx)
+                Daily Run Productivity (.xlsx or .xls)
                 <input
                   type="file"
-                  accept=".xlsx"
+                  accept=".xlsx,.xls"
                   className="mt-1 block text-sm"
                   onChange={(e) => setFile1(e.target.files?.[0] || null)}
                 />
               </label>
               <label className="text-sm text-slate-600">
-                Driver Performance (.xlsx)
+                Driver Performance (.xlsx or .xls)
                 <input
                   type="file"
-                  accept=".xlsx"
+                  accept=".xlsx,.xls"
                   className="mt-1 block text-sm"
                   onChange={(e) => setFile2(e.target.files?.[0] || null)}
                 />
