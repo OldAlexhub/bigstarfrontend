@@ -1,5 +1,10 @@
+// Set via client/.env.production (REACT_APP_API_URL) so the built app calls
+// the deployed backend instead of a relative path. Empty in dev, where CRA's
+// "proxy" field in package.json forwards relative /api/* calls to localhost.
+const API_BASE = process.env.REACT_APP_API_URL || "";
+
 const request = async (path, options = {}) => {
-  const res = await fetch(path, {
+  const res = await fetch(`${API_BASE}${path}`, {
     credentials: "include",
     headers: { "Content-Type": "application/json" },
     ...options,
