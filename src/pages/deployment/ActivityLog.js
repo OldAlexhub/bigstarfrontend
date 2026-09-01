@@ -1,13 +1,26 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { apiGet } from "../../api/client";
 import { toISODate, todayInTimezone, addDays } from "../../utils/dates";
 import { useLatestRequest } from "../../hooks/useLatestRequest";
 
+// Multi-term, cross-field search: every space-separated word in the query
+// must appear somewhere in the entry (user name, username, action, or
+// summary), but each word can match a different field — so "gad suspended"
+// finds an entry by Mohamed Gad whose summary mentions "suspended" even
+// though neither field alone contains both words.
+const matchesSearch = (entry, query) => {
+  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length) return true;
+  const haystack = [entry.name, entry.username, entry.action, entry.summary].filter(Boolean).join(" ").toLowerCase();
+  return terms.every((term) => haystack.includes(term));
+};
+
 const ActivityLog = () => {
   const { selectedDivision } = useOutletContext();
   const [from, setFrom] = useState(toISODate(addDays(todayInTimezone(selectedDivision?.timezone), -6)));
   const [to, setTo] = useState(toISODate(todayInTimezone(selectedDivision?.timezone)));
+  const [search, setSearch] = useState("");
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -30,6 +43,8 @@ const ActivityLog = () => {
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDivision, from, to]);
+
+  const filteredEntries = useMemo(() => entries.filter((entry) => matchesSearch(entry, search)), [entries, search]);
 
   return (
     <div>
@@ -54,6 +69,16 @@ const ActivityLog = () => {
             />
           </label>
         </div>
+        <label className="text-sm text-slate-600">
+          Search
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by user or action…"
+            className="mt-1 block w-64 rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+          />
+        </label>
       </div>
 
       {error && <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
@@ -84,7 +109,14 @@ const ActivityLog = () => {
                 </td>
               </tr>
             )}
-            {entries.map((entry) => (
+            {!loading && entries.length > 0 && filteredEntries.length === 0 && (
+              <tr>
+                <td colSpan={3} className="px-3 py-6 text-center text-slate-400">
+                  No activity matches "{search}".
+                </td>
+              </tr>
+            )}
+            {filteredEntries.map((entry) => (
               <tr key={entry._id}>
                 <td className="whitespace-nowrap px-3 py-2 text-slate-600">
                   {new Date(entry.createdAt).toLocaleString()}
