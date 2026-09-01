@@ -15,13 +15,12 @@ const DailyKpiUpload = () => {
   const [audit, setAudit] = useState(null);
   const { begin, isCurrent } = useLatestRequest();
 
-  const [source, setSource] = useState("ecolane");
   const [file1, setFile1] = useState(null);
-  const [file2, setFile2] = useState(null);
   const [preprocessing, setPreprocessing] = useState(false);
   const [preprocessError, setPreprocessError] = useState("");
   const [previewRows, setPreviewRows] = useState(null);
   const [previewWarnings, setPreviewWarnings] = useState([]);
+  const [previewMergeNotes, setPreviewMergeNotes] = useState([]);
   const [confirming, setConfirming] = useState(false);
 
   const weekEnd = toISODate(addDays(weekStart, 6));
@@ -55,18 +54,17 @@ const DailyKpiUpload = () => {
   };
 
   const handlePreprocess = async () => {
-    if (!selectedDivision || !file1 || (source === "ecolane" && !file2)) return;
+    if (!selectedDivision || !file1) return;
     setPreprocessing(true);
     setPreprocessError("");
     setPreviewRows(null);
     setPreviewWarnings([]);
+    setPreviewMergeNotes([]);
     setAudit(null);
     try {
       const formData = new FormData();
       formData.append("division", selectedDivision._id);
-      formData.append("source", source);
       formData.append("file1", file1);
-      if (source === "ecolane") formData.append("file2", file2);
       const res = await fetch(`${API_BASE}/api/network-success/kpi-entries/preprocess`, {
         method: "POST",
         credentials: "include",
@@ -75,9 +73,20 @@ const DailyKpiUpload = () => {
       const data = await res.json().catch(() => {
         throw new Error("Could not reach the server — it may still be restarting. Try again in a moment.");
       });
-      if (!res.ok) throw new Error(data.message || "Could not preprocess the file(s).");
-      setPreviewRows(data.rows.map((r) => ({ ...r, actualHours: String(r.actualHours), totalTrips: String(r.totalTrips), otpPct: String(r.otpPct) })));
+      if (!res.ok) throw new Error(data.message || "Could not preprocess the file.");
+      setPreviewRows(
+        data.rows.map((r) => ({
+          ...r,
+          actualHours: String(r.actualHours),
+          totalTrips: String(r.totalTrips),
+          otpPct: String(r.otpPct),
+          routeClosures: String(r.routeClosures),
+          lateToFirst: String(r.lateToFirst),
+          lateDeploy: String(r.lateDeploy),
+        }))
+      );
       setPreviewWarnings(data.warnings || []);
+      setPreviewMergeNotes(data.mergeNotes || []);
     } catch (err) {
       setPreprocessError(err.message);
     } finally {
@@ -113,8 +122,8 @@ const DailyKpiUpload = () => {
       setAudit(data.audit);
       setPreviewRows(null);
       setPreviewWarnings([]);
+      setPreviewMergeNotes([]);
       setFile1(null);
-      setFile2(null);
       load();
     } catch (err) {
       setPreprocessError(err.message);
@@ -145,79 +154,26 @@ const DailyKpiUpload = () => {
       <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6">
         <h2 className="mb-2 text-sm font-semibold text-slate-900">Preprocess a Raw Export</h2>
         <p className="mb-4 text-sm text-slate-500">
-          Upload the file(s) straight from your operations system and skip retyping the numbers.
-          Vision is one file; Ecolane is the Daily Run Productivity and Driver Performance files
-          together, joined by driver. Review the results below before anything is saved.
+          Upload the Daily KPI Tracker workbook straight from Provider Management and skip
+          retyping the numbers. Review the results below before anything is saved — Route
+          Closures/Late to First/Late Deploy here are only used when Deployment has no record of
+          a route/day at all; otherwise Deployment's own numbers stay authoritative.
         </p>
 
-        <div className="mb-4 flex flex-wrap items-center gap-4">
-          <label className="flex items-center gap-2 text-sm text-slate-700">
-            <input
-              type="radio"
-              name="report-source"
-              value="ecolane"
-              checked={source === "ecolane"}
-              onChange={() => {
-                setSource("ecolane");
-                setFile1(null);
-                setFile2(null);
-              }}
-            />
-            Ecolane
-          </label>
-          <label className="flex items-center gap-2 text-sm text-slate-700">
-            <input
-              type="radio"
-              name="report-source"
-              value="vision"
-              checked={source === "vision"}
-              onChange={() => {
-                setSource("vision");
-                setFile1(null);
-                setFile2(null);
-              }}
-            />
-            Vision
-          </label>
-        </div>
-
         <div className="mb-4 flex flex-wrap items-end gap-4">
-          {source === "vision" ? (
-            <label className="text-sm text-slate-600">
-              Vision Para Operations (.xlsx or .xls)
-              <input
-                type="file"
-                accept=".xlsx,.xls"
-                className="mt-1 block text-sm"
-                onChange={(e) => setFile1(e.target.files?.[0] || null)}
-              />
-            </label>
-          ) : (
-            <>
-              <label className="text-sm text-slate-600">
-                Daily Run Productivity (.xlsx or .xls)
-                <input
-                  type="file"
-                  accept=".xlsx,.xls"
-                  className="mt-1 block text-sm"
-                  onChange={(e) => setFile1(e.target.files?.[0] || null)}
-                />
-              </label>
-              <label className="text-sm text-slate-600">
-                Driver Performance (.xlsx or .xls)
-                <input
-                  type="file"
-                  accept=".xlsx,.xls"
-                  className="mt-1 block text-sm"
-                  onChange={(e) => setFile2(e.target.files?.[0] || null)}
-                />
-              </label>
-            </>
-          )}
+          <label className="text-sm text-slate-600">
+            Daily KPI Tracker (.xlsx)
+            <input
+              type="file"
+              accept=".xlsx"
+              className="mt-1 block text-sm"
+              onChange={(e) => setFile1(e.target.files?.[0] || null)}
+            />
+          </label>
           <button
             type="button"
             onClick={handlePreprocess}
-            disabled={preprocessing || !file1 || (source === "ecolane" && !file2)}
+            disabled={preprocessing || !file1}
             className="rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
           >
             {preprocessing ? "Processing…" : "Preprocess"}
@@ -236,9 +192,20 @@ const DailyKpiUpload = () => {
           </p>
         )}
 
+        {previewMergeNotes.length > 0 && (
+          <div className="mb-4 rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-700">
+            <p className="font-medium">Combined (same route, same day):</p>
+            <ul className="list-inside list-disc">
+              {previewMergeNotes.map((n, i) => (
+                <li key={i}>{n}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {previewWarnings.length > 0 && (
           <div className="mb-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-700">
-            <p className="font-medium">Skipped:</p>
+            <p className="font-medium">Skipped / needs review:</p>
             <ul className="list-inside list-disc">
               {previewWarnings.map((w, i) => (
                 <li key={i}>{w}</li>
@@ -253,8 +220,18 @@ const DailyKpiUpload = () => {
               <table className="min-w-full divide-y divide-slate-200 text-sm">
                 <thead className="bg-slate-50">
                   <tr>
-                    {["Date", "Route", "Actual Service Hours", "Total Trips", "OTP %", ""].map((h) => (
-                      <th key={h} className="px-3 py-2 text-left font-medium text-slate-500">
+                    {[
+                      "Date",
+                      "Route",
+                      "Actual Service Hours",
+                      "Total Trips",
+                      "OTP %",
+                      "Route Closures",
+                      "Late to First",
+                      "Late Deploy",
+                      "",
+                    ].map((h) => (
+                      <th key={h} className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-500">
                         {h}
                       </th>
                     ))}
@@ -263,7 +240,7 @@ const DailyKpiUpload = () => {
                 <tbody className="divide-y divide-slate-100">
                   {previewRows.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="px-3 py-4 text-center text-slate-400">
+                      <td colSpan={9} className="px-3 py-4 text-center text-slate-400">
                         Nothing to import - every row was skipped. See the warnings above.
                       </td>
                     </tr>
@@ -283,8 +260,11 @@ const DailyKpiUpload = () => {
                           type="text"
                           value={row.route}
                           onChange={(e) => updatePreviewRow(i, "route", e.target.value)}
-                          className="w-20 rounded border border-slate-300 px-1.5 py-1 text-sm"
+                          className="w-24 rounded border border-slate-300 px-1.5 py-1 text-sm"
                         />
+                        {row.mergedFrom && (
+                          <div className="mt-0.5 text-xs text-slate-400">merged: {row.mergedFrom.join(", ")}</div>
+                        )}
                       </td>
                       <td className="px-2 py-1">
                         <input
@@ -313,6 +293,30 @@ const DailyKpiUpload = () => {
                         />
                       </td>
                       <td className="px-2 py-1">
+                        <input
+                          type="number"
+                          value={row.routeClosures}
+                          onChange={(e) => updatePreviewRow(i, "routeClosures", e.target.value)}
+                          className="w-14 rounded border border-slate-300 px-1.5 py-1 text-sm"
+                        />
+                      </td>
+                      <td className="px-2 py-1">
+                        <input
+                          type="number"
+                          value={row.lateToFirst}
+                          onChange={(e) => updatePreviewRow(i, "lateToFirst", e.target.value)}
+                          className="w-14 rounded border border-slate-300 px-1.5 py-1 text-sm"
+                        />
+                      </td>
+                      <td className="px-2 py-1">
+                        <input
+                          type="number"
+                          value={row.lateDeploy}
+                          onChange={(e) => updatePreviewRow(i, "lateDeploy", e.target.value)}
+                          className="w-14 rounded border border-slate-300 px-1.5 py-1 text-sm"
+                        />
+                      </td>
+                      <td className="px-2 py-1">
                         <button onClick={() => removePreviewRow(i)} className="text-xs text-red-600 hover:underline">
                           Remove
                         </button>
@@ -336,6 +340,7 @@ const DailyKpiUpload = () => {
                 onClick={() => {
                   setPreviewRows(null);
                   setPreviewWarnings([]);
+                  setPreviewMergeNotes([]);
                 }}
                 className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
               >
@@ -379,6 +384,7 @@ const DailyKpiUpload = () => {
             {rows.map((row) => {
               const fulfillment = row.schedHrs > 0 ? row.actualHrs / row.schedHrs : null;
               const tpsh = row.actualHrs > 0 ? row.totalTrips / row.actualHrs : null;
+              const fromUpload = row.closuresSource === "upload";
               return (
                 <tr key={row.entryId}>
                   <td className="whitespace-nowrap px-3 py-2 text-slate-600">{row.date}</td>
@@ -391,9 +397,27 @@ const DailyKpiUpload = () => {
                   <td className="whitespace-nowrap px-3 py-2 text-slate-600">{row.totalTrips}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-slate-600">{round2(tpsh)}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-slate-600">{pct(row.otpPct)}</td>
-                  <td className="whitespace-nowrap px-3 py-2 text-slate-600">{row.routeClosures}</td>
-                  <td className="whitespace-nowrap px-3 py-2 text-slate-600">{row.lateToFirst}</td>
-                  <td className="whitespace-nowrap px-3 py-2 text-slate-600">{row.lateDeploy}</td>
+                  <td
+                    className="whitespace-nowrap px-3 py-2 text-slate-600"
+                    title={fromUpload ? "From the uploaded tracker (Deployment has no record for this route/day)" : "From Deployment"}
+                  >
+                    {row.routeClosures}
+                    {fromUpload && <span className="ml-1 text-xs text-blue-500">↑</span>}
+                  </td>
+                  <td
+                    className="whitespace-nowrap px-3 py-2 text-slate-600"
+                    title={fromUpload ? "From the uploaded tracker (Deployment has no record for this route/day)" : "From Deployment"}
+                  >
+                    {row.lateToFirst}
+                    {fromUpload && <span className="ml-1 text-xs text-blue-500">↑</span>}
+                  </td>
+                  <td
+                    className="whitespace-nowrap px-3 py-2 text-slate-600"
+                    title={fromUpload ? "From the uploaded tracker (Deployment has no record for this route/day)" : "From Deployment"}
+                  >
+                    {row.lateDeploy}
+                    {fromUpload && <span className="ml-1 text-xs text-blue-500">↑</span>}
+                  </td>
                   <td className="whitespace-nowrap px-3 py-2">
                     <button onClick={() => handleDelete(row.entryId)} className="text-xs text-red-600 hover:underline">
                       Remove

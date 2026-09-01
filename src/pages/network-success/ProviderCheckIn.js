@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useOutletContext } from "react-router-dom";
 import { apiGet } from "../../api/client";
+import MetricCard from "../../components/MetricCard";
+import RankCard from "../../components/RankCard";
 
 const pct = (v) => (v == null ? "—" : `${Math.round(v * 100)}%`);
 const num = (v) => (v == null ? "—" : v);
@@ -76,28 +78,39 @@ const ProviderCheckIn = () => {
           </p>
 
           {data.repeatBottom5.length > 0 && (
-            <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-              {data.repeatBottom5.length} route(s) in the Bottom 5 for {data.repeatBottom5[0].streak}+ consecutive
-              week(s).
-            </p>
+            <div className="mt-3">
+              <p className="mb-2 text-sm font-medium text-red-700">
+                {data.repeatBottom5.length} route(s) repeating in the Bottom 5:
+              </p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {data.repeatBottom5.map((entry) => (
+                  <RankCard key={entry.kpiKey} entry={entry} />
+                ))}
+              </div>
+            </div>
           )}
 
           <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-            {[
-              ["Total Trips", num(data.weeklySummary.totalTrips)],
-              ["Utilization", pct(data.weeklySummary.utilizationPct)],
-              ["Avg Trips/Day", num(data.weeklySummary.avgTripsPerDay)],
-              ["TPSH", num(data.weeklySummary.tpsh)],
-              ["Avg OTP", pct(data.weeklySummary.avgOtp)],
-              ["Late to First", num(data.weeklySummary.lateToFirst)],
-              ["Late Deploy", num(data.weeklySummary.lateDeploy)],
-              ["Routes Below OTP", num(data.weeklySummary.routesBelowOtp)],
-            ].map(([label, value]) => (
-              <div key={label} className="rounded-lg border border-slate-100 bg-slate-50 p-3">
-                <p className="text-xs text-slate-500">{label}</p>
-                <p className="text-lg font-semibold text-slate-900">{value}</p>
-              </div>
-            ))}
+            <MetricCard label="Total Trips" value={num(data.weeklySummary.totalTrips)} />
+            <MetricCard
+              label="Utilization"
+              value={pct(data.weeklySummary.utilizationPct)}
+              tone={data.weeklySummary.routesBelowUtilization > 0 ? "warning" : "good"}
+            />
+            <MetricCard label="Avg Trips/Day" value={num(data.weeklySummary.avgTripsPerDay)} />
+            <MetricCard
+              label="TPSH"
+              value={num(data.weeklySummary.tpsh)}
+              tone={data.kpiSettings && data.weeklySummary.tpsh != null ? (data.weeklySummary.tpsh >= data.kpiSettings.tpshBench ? "good" : "bad") : "neutral"}
+            />
+            <MetricCard
+              label="Avg OTP"
+              value={pct(data.weeklySummary.avgOtp)}
+              tone={data.kpiSettings && data.weeklySummary.avgOtp != null ? (data.weeklySummary.avgOtp >= data.kpiSettings.otpThresh ? "good" : "bad") : "neutral"}
+            />
+            <MetricCard label="Late to First" value={num(data.weeklySummary.lateToFirst)} tone={data.weeklySummary.lateToFirst > 0 ? "warning" : "good"} />
+            <MetricCard label="Late Deploy" value={num(data.weeklySummary.lateDeploy)} tone={data.weeklySummary.lateDeploy > 0 ? "warning" : "good"} />
+            <MetricCard label="Routes Below OTP" value={num(data.weeklySummary.routesBelowOtp)} tone={data.weeklySummary.routesBelowOtp > 0 ? "bad" : "good"} />
           </div>
 
           <div className="mt-6">

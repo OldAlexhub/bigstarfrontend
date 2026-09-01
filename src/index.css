@@ -15,3 +15,18 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+/* Report pages (End-of-Day Brief, Weekly Report, Provider Check-In,
+   Provider Performance Review) hide the navbar and Network Success's own
+   picker/tab chrome via print:hidden; this resets the constrained content
+   width so a printed report uses the full page and keeps table rows from
+   splitting across a page break. */
+@media print {
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+  tr {
+    break-inside: avoid;
+  }
+}

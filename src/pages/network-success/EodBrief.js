@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { apiGet } from "../../api/client";
 import { useAuth } from "../../context/AuthContext";
+import MetricCard from "../../components/MetricCard";
 import { toISODate, todayInTimezone } from "../../utils/dates";
 
 const pct = (v) => (v == null ? "—" : `${Math.round(v * 100)}%`);
@@ -79,9 +80,18 @@ const EodBrief = () => {
           <button
             type="button"
             onClick={handleCopy}
-            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
+            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 print:hidden"
           >
             Copy for Teams
+          </button>
+        )}
+        {data && (
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 print:hidden"
+          >
+            Print
           </button>
         )}
       </div>
@@ -102,21 +112,14 @@ const EodBrief = () => {
             {data.preparedBy && <p className="text-sm text-slate-500">Prepared by {data.preparedBy}</p>}
 
             <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-              {[
-                ["Planned Routes", num(data.summary.plannedRoutes)],
-                ["Operated Routes", num(data.summary.operatedRoutes)],
-                ["Utilization", pct(data.summary.utilizationPct)],
-                ["SHF", pct(data.summary.shfPct)],
-                ["TPSH", num(data.summary.tpsh)],
-                ["Avg OTP", pct(data.summary.avgOtp)],
-                ["Total Trips", num(data.summary.totalTrips)],
-                ["Actual Hours", num(data.summary.totalActualHrs)],
-              ].map(([label, value]) => (
-                <div key={label} className="rounded-lg border border-slate-100 bg-slate-50 p-3">
-                  <p className="text-xs text-slate-500">{label}</p>
-                  <p className="text-lg font-semibold text-slate-900">{value}</p>
-                </div>
-              ))}
+              <MetricCard label="Planned Routes" value={num(data.summary.plannedRoutes)} />
+              <MetricCard label="Operated Routes" value={num(data.summary.operatedRoutes)} />
+              <MetricCard label="Utilization" value={pct(data.summary.utilizationPct)} />
+              <MetricCard label="SHF" value={pct(data.summary.shfPct)} />
+              <MetricCard label="TPSH" value={num(data.summary.tpsh)} />
+              <MetricCard label="Avg OTP" value={pct(data.summary.avgOtp)} />
+              <MetricCard label="Total Trips" value={num(data.summary.totalTrips)} />
+              <MetricCard label="Actual Hours" value={num(data.summary.totalActualHrs)} />
             </div>
 
             {(data.summary.routeClosures > 0 || data.summary.lateToFirst > 0 || data.summary.lateDeploy > 0) && (

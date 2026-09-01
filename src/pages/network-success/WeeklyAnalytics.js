@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { apiGet } from "../../api/client";
+import TrendChart from "../../components/TrendChart";
+import RouteQuadrantChart from "../../components/RouteQuadrantChart";
 
 const pct = (v) => (v == null ? "—" : `${Math.round(v * 100)}%`);
 
@@ -24,44 +26,27 @@ const WeeklyAnalytics = () => {
   if (error) return <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>;
   if (!data) return null;
 
-  const maxWeekTrips = Math.max(1, ...data.weeks.map((w) => w.summary.totalTrips));
+  const otpPoints = data.weeks.map((w) => ({ bucketStart: w.weekStart, avgOtp: w.summary.avgOtp }));
+  const tripPoints = data.weeks.map((w) => ({ bucketStart: w.weekStart, totalTrips: w.summary.totalTrips }));
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-      <div className="rounded-xl border border-slate-200 bg-white p-6">
-        <h3 className="mb-2 text-sm font-semibold text-slate-900">6-Week OTP Trend + Forecast</h3>
-        <div className="flex items-end gap-2" style={{ height: 120 }}>
-          {data.weeks.map((w) => (
-            <div key={w.weekStart} className="flex flex-1 flex-col items-center gap-1">
-              <div
-                className="w-full rounded-t bg-brand-500"
-                style={{ height: `${Math.max(4, (w.summary.avgOtp || 0) * 100)}px` }}
-              />
-              <span className="text-[10px] text-slate-400">{w.weekStart.slice(5)}</span>
-            </div>
-          ))}
-        </div>
+      <div>
+        <TrendChart title="6-Week OTP Trend" points={otpPoints} valueKey="avgOtp" formatValue={pct} />
         <p className="mt-2 text-xs text-slate-500">
           Next 4 weeks forecast: {data.otpForecast.forecast.map((f) => pct(f)).join(", ") || "—"}
         </p>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-6">
-        <h3 className="mb-2 text-sm font-semibold text-slate-900">6-Week Trip Volume Trend</h3>
-        <div className="flex items-end gap-2" style={{ height: 120 }}>
-          {data.weeks.map((w) => (
-            <div key={w.weekStart} className="flex flex-1 flex-col items-center gap-1">
-              <div
-                className="w-full rounded-t bg-slate-400"
-                style={{ height: `${Math.max(4, (w.summary.totalTrips / maxWeekTrips) * 100)}px` }}
-              />
-              <span className="text-[10px] text-slate-400">{w.weekStart.slice(5)}</span>
-            </div>
-          ))}
-        </div>
+      <div>
+        <TrendChart title="6-Week Trip Volume Trend" points={tripPoints} valueKey="totalTrips" color="#94a3b8" formatValue={(v) => v} />
         <p className="mt-2 text-xs text-slate-500">
           Next 4 weeks forecast: {data.tripForecast.forecast.join(", ") || "—"}
         </p>
+      </div>
+
+      <div className="lg:col-span-2">
+        <RouteQuadrantChart points={data.quadrant} otpThresh={data.otpThresh} shfThresh={data.shfThresh} />
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-6">

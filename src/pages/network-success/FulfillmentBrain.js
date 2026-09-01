@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { apiGet } from "../../api/client";
+import MetricCard from "../../components/MetricCard";
 
 const ALL_DAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 const pct = (v) => (v == null ? "—" : `${Math.round(v * 100)}%`);
@@ -72,17 +73,18 @@ const FulfillmentBrain = () => {
       {!loading && data && (
         <>
           <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-            {[
-              ["Scheduled Duties", data.summary.totalScheduledDuties],
-              ["Covered Duties", data.summary.totalCoveredDuties],
-              ["Duty Fulfillment", pct(data.summary.dutyFulfillmentPct)],
-              ["Core Hour Fulfillment", pct(data.summary.hourFulfillmentPct)],
-            ].map(([label, value]) => (
-              <div key={label} className="rounded-lg border border-slate-200 bg-white p-4">
-                <p className="text-xs text-slate-500">{label}</p>
-                <p className="mt-1 text-xl font-semibold text-slate-900">{value}</p>
-              </div>
-            ))}
+            <MetricCard label="Scheduled Duties" value={data.summary.totalScheduledDuties} />
+            <MetricCard label="Covered Duties" value={data.summary.totalCoveredDuties} />
+            <MetricCard
+              label="Duty Fulfillment"
+              value={pct(data.summary.dutyFulfillmentPct)}
+              tone={data.summary.dutyFulfillmentPct == null ? "neutral" : data.summary.dutyFulfillmentPct >= targetPct / 100 ? "good" : "bad"}
+            />
+            <MetricCard
+              label="Core Hour Fulfillment"
+              value={pct(data.summary.hourFulfillmentPct)}
+              tone={data.summary.hourFulfillmentPct == null ? "neutral" : data.summary.hourFulfillmentPct >= targetPct / 100 ? "good" : "bad"}
+            />
           </div>
 
           <div className="mb-6 overflow-x-auto rounded-xl border border-slate-200 bg-white">

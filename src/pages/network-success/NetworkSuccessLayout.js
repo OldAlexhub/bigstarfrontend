@@ -98,7 +98,7 @@ const NetworkSuccessLayout = () => {
 
   return (
     <div>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4 print:hidden">
         <h1 className="text-2xl font-semibold text-slate-900">Network Success</h1>
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-2 text-sm text-slate-600">
@@ -126,7 +126,7 @@ const NetworkSuccessLayout = () => {
         </div>
       </div>
 
-      <div className="mb-6 space-y-2 border-b border-slate-200 pb-4">
+      <div className="mb-6 space-y-2 border-b border-slate-200 pb-4 print:hidden">
         {TAB_GROUPS.map((group) => (
           <div key={group.label} className="flex flex-wrap items-center gap-2">
             <span className="w-20 shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-400">

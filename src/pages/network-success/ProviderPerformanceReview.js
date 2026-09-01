@@ -12,6 +12,13 @@ const TREND_STYLES = {
   "Insufficient Data": "text-slate-400",
 };
 
+const TREND_CARD_STYLES = {
+  Improving: "border-green-200 bg-green-50",
+  Deteriorating: "border-red-200 bg-red-50",
+  Stable: "border-slate-200 bg-slate-50",
+  "Insufficient Data": "border-slate-100 bg-slate-50",
+};
+
 const STATUS_STYLES = {
   IMPROVING: "bg-green-50 text-green-700",
   DETERIORATING: "bg-red-50 text-red-700",
@@ -109,7 +116,7 @@ const ProviderPerformanceReview = () => {
 
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {data.metrics.map((m) => (
-              <div key={m.key} className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+              <div key={m.key} className={`rounded-lg border p-3 ${TREND_CARD_STYLES[m.trend] || TREND_CARD_STYLES.Stable}`}>
                 <p className="text-xs text-slate-500">{m.label}</p>
                 <p className="text-lg font-semibold text-slate-900">
                   {m.key === "avgLateFirst" || m.key === "avgRouteClosures" ? num(m.recentVal) : pct(m.recentVal)}

@@ -1,36 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useOutletContext } from "react-router-dom";
 import { apiGet } from "../../api/client";
+import MetricCard from "../../components/MetricCard";
+import RankCard from "../../components/RankCard";
 
 const pct = (v) => (v == null ? "—" : `${Math.round(v * 100)}%`);
 const num = (v) => (v == null ? "—" : v);
-
-const STREAK_STYLES = {
-  Elite: "bg-amber-100 text-amber-800",
-  "Rising Star": "bg-blue-100 text-blue-700",
-  Sustained: "bg-green-100 text-green-700",
-  "Act Now": "bg-red-100 text-red-700",
-  Improving: "bg-green-100 text-green-700",
-  Worsening: "bg-red-100 text-red-700",
-  Stagnant: "bg-amber-100 text-amber-800",
-};
-
-const RankCard = ({ entry }) => (
-  <div className="rounded-lg border border-slate-200 bg-white p-4">
-    <div className="flex items-center justify-between">
-      <span className="text-sm font-semibold text-slate-900">
-        #{entry.rank} · {entry.route}
-      </span>
-      {entry.streakStatus && (
-        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STREAK_STYLES[entry.streakStatus] || "bg-slate-100 text-slate-600"}`}>
-          {entry.streakStatus}
-        </span>
-      )}
-    </div>
-    <p className="mt-1 text-xs text-slate-500">{entry.provider}</p>
-    <p className="mt-2 text-lg font-semibold text-slate-900">{pct(entry.composite)}</p>
-  </div>
-);
 
 const NetworkDashboard = () => {
   const { selectedDivision, weekStart } = useOutletContext();
@@ -52,7 +27,8 @@ const NetworkDashboard = () => {
   if (error) return <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>;
   if (!data) return null;
 
-  const { summary, rankings, streaks } = data;
+  const { summary, rankings, streaks, kpiSettings } = data;
+  const toneVs = (value, thresh) => (value == null || thresh == null ? "neutral" : value >= thresh ? "good" : "bad");
 
   return (
     <div>
@@ -65,17 +41,10 @@ const NetworkDashboard = () => {
         </Link>
       </div>
       <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        {[
-          ["Routes Ranked", num(summary.totalRoutes)],
-          ["Avg OTP", pct(summary.avgOtp)],
-          ["Avg SHF", pct(summary.avgShf)],
-          ["Avg TPSH", num(summary.avgTpsh)],
-        ].map(([label, value]) => (
-          <div key={label} className="rounded-lg border border-slate-200 bg-white p-4">
-            <p className="text-xs text-slate-500">{label}</p>
-            <p className="mt-1 text-xl font-semibold text-slate-900">{value}</p>
-          </div>
-        ))}
+        <MetricCard label="Routes Ranked" value={num(summary.totalRoutes)} />
+        <MetricCard label="Avg OTP" value={pct(summary.avgOtp)} tone={toneVs(summary.avgOtp, kpiSettings?.otpThresh)} />
+        <MetricCard label="Avg SHF" value={pct(summary.avgShf)} tone={toneVs(summary.avgShf, kpiSettings?.shfThresh)} />
+        <MetricCard label="Avg TPSH" value={num(summary.avgTpsh)} tone={toneVs(summary.avgTpsh, kpiSettings?.tpshBench)} />
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">

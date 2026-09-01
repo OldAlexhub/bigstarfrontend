@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useOutletContext } from "react-router-dom";
 import { apiGet } from "../../api/client";
 import { useLatestRequest } from "../../hooks/useLatestRequest";
+import TrendChart from "../../components/TrendChart";
 
 const pct = (v) => (v == null ? "—" : `${Math.round(v * 100)}%`);
 const num = (v) => (v == null ? "—" : v);
@@ -19,6 +20,12 @@ const POSITION_STYLES = {
   Ahead: "bg-green-50 text-green-700",
   Behind: "bg-red-50 text-red-700",
   Aligned: "bg-slate-100 text-slate-600",
+};
+
+const POSITION_CARD_STYLES = {
+  Ahead: "border-green-200 bg-green-50",
+  Behind: "border-red-200 bg-red-50",
+  Aligned: "border-slate-200 bg-white",
 };
 
 const ProviderDiagnostics = () => {
@@ -82,7 +89,7 @@ const ProviderDiagnostics = () => {
         <>
           <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             {data.comparison.map((c) => (
-              <div key={c.key} className="rounded-lg border border-slate-200 bg-white p-3">
+              <div key={c.key} className={`rounded-lg border p-3 ${POSITION_CARD_STYLES[c.position] || POSITION_CARD_STYLES.Aligned}`}>
                 <p className="text-xs text-slate-500">{METRIC_LABELS[c.key]}</p>
                 <p className="text-lg font-semibold text-slate-900">
                   {c.key.includes("Otp") || c.key.includes("Shf") ? pct(c.providerVal) : num(c.providerVal)}
@@ -109,19 +116,13 @@ const ProviderDiagnostics = () => {
             )}
           </div>
 
-          <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6">
-            <h3 className="mb-2 text-sm font-semibold text-slate-900">6-Week Trend</h3>
-            <div className="flex items-end gap-2" style={{ height: 100 }}>
-              {data.weeklyTrend.map((w) => (
-                <div key={w.weekStart} className="flex flex-1 flex-col items-center gap-1">
-                  <div
-                    className="w-full rounded-t bg-brand-500"
-                    style={{ height: `${Math.max(4, (w.composite || 0) * 100)}px` }}
-                  />
-                  <span className="text-[10px] text-slate-400">{w.weekStart?.slice(5)}</span>
-                </div>
-              ))}
-            </div>
+          <div className="mb-6">
+            <TrendChart
+              title="6-Week Trend"
+              points={data.weeklyTrend.map((w) => ({ bucketStart: w.weekStart, composite: w.composite }))}
+              valueKey="composite"
+              formatValue={pct}
+            />
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

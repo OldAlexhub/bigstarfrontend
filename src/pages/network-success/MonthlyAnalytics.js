@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { apiGet } from "../../api/client";
 import { toISODate, todayInTimezone } from "../../utils/dates";
+import MetricCard from "../../components/MetricCard";
 
 const pct = (v) => (v == null ? "—" : `${Math.round(v * 100)}%`);
 const num = (v) => (v == null ? "—" : v);
@@ -41,17 +42,10 @@ const MonthlyAnalytics = () => {
       </div>
 
       <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        {[
-          ["Trips MTD", num(data.summary.totalTrips)],
-          ["Avg OTP", pct(data.summary.avgOtp)],
-          ["Avg SHF", pct(data.summary.avgShf)],
-          ["Avg TPSH", num(data.summary.avgTpsh)],
-        ].map(([label, value]) => (
-          <div key={label} className="rounded-lg border border-slate-200 bg-white p-4">
-            <p className="text-xs text-slate-500">{label}</p>
-            <p className="mt-1 text-xl font-semibold text-slate-900">{value}</p>
-          </div>
-        ))}
+        <MetricCard label="Trips MTD" value={num(data.summary.totalTrips)} />
+        <MetricCard label="Avg OTP" value={pct(data.summary.avgOtp)} tone={data.kpiSettings && data.summary.avgOtp != null ? (data.summary.avgOtp >= data.kpiSettings.otpThresh ? "good" : "bad") : "neutral"} />
+        <MetricCard label="Avg SHF" value={pct(data.summary.avgShf)} tone={data.kpiSettings && data.summary.avgShf != null ? (data.summary.avgShf >= data.kpiSettings.shfThresh ? "good" : "bad") : "neutral"} />
+        <MetricCard label="Avg TPSH" value={num(data.summary.avgTpsh)} tone={data.kpiSettings && data.summary.avgTpsh != null ? (data.summary.avgTpsh >= data.kpiSettings.tpshBench ? "good" : "bad") : "neutral"} />
       </div>
 
       <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6">
