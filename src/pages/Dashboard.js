@@ -79,11 +79,6 @@ const Dashboard = () => {
     label: `${d.name} — ${i.routeCode ? `Route ${i.routeCode}` : "No route"} (${i.disruptionType})`,
     to: `/deployment/issue-log?division=${d.divisionId}`,
   }));
-  const providerItems = flatten("belowTargetProviders", (d, p) => ({
-    key: `${d.divisionId}-${p.provider}`,
-    label: `${d.name} — ${p.provider} (failed ${p.failedKpis.join(", ")})`,
-    to: `/network-success/dashboard?division=${d.divisionId}`,
-  }));
 
   return (
     <div>
@@ -96,44 +91,32 @@ const Dashboard = () => {
         </p>
       </div>
 
-      {!loading && summary && (summary.hasOperationsAccess || summary.hasNetworkSuccessAccess) && (
+      {!loading && summary && summary.hasOperationsAccess && (
         <>
           <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {summary.hasOperationsAccess && (
-              <>
-                <StatCard label="Run Cut Fulfillment This Week" value={pct(summary.totals.runCutFulfillmentPct)} />
-                <StatCard
-                  label="Revenue Hour Fulfillment This Week"
-                  value={pct(summary.totals.revenueHourFulfillmentPct)}
-                />
-                <ExpandableStatCard
-                  label="Unassigned Routes"
-                  tone={unassignedItems.length > 0 ? "text-amber-600" : "text-slate-900"}
-                  items={unassignedItems}
-                />
-                <ExpandableStatCard
-                  label="Routes Suspended Today"
-                  tone={suspendedItems.length > 0 ? "text-red-600" : "text-slate-900"}
-                  items={suspendedItems}
-                />
-                <ExpandableStatCard
-                  label="Open Issues Today"
-                  tone={issueItems.length > 0 ? "text-amber-600" : "text-slate-900"}
-                  items={issueItems}
-                />
-              </>
-            )}
-            {summary.hasNetworkSuccessAccess && (
-              <ExpandableStatCard
-                label="Providers Below Target This Week"
-                tone={providerItems.length > 0 ? "text-amber-600" : "text-slate-900"}
-                items={providerItems}
-              />
-            )}
+            <StatCard label="Run Cut Fulfillment This Week" value={pct(summary.totals.runCutFulfillmentPct)} />
+            <StatCard
+              label="Revenue Hour Fulfillment This Week"
+              value={pct(summary.totals.revenueHourFulfillmentPct)}
+            />
+            <ExpandableStatCard
+              label="Unassigned Routes"
+              tone={unassignedItems.length > 0 ? "text-amber-600" : "text-slate-900"}
+              items={unassignedItems}
+            />
+            <ExpandableStatCard
+              label="Routes Suspended Today"
+              tone={suspendedItems.length > 0 ? "text-red-600" : "text-slate-900"}
+              items={suspendedItems}
+            />
+            <ExpandableStatCard
+              label="Open Issues Today"
+              tone={issueItems.length > 0 ? "text-amber-600" : "text-slate-900"}
+              items={issueItems}
+            />
           </div>
 
-          {summary.hasOperationsAccess && (
-            <div className="mb-8 overflow-x-auto rounded-xl border border-slate-200 bg-white">
+          <div className="mb-8 overflow-x-auto rounded-xl border border-slate-200 bg-white">
               <table className="min-w-full divide-y divide-slate-200 text-sm">
                 <thead className="bg-slate-50">
                   <tr>
@@ -161,8 +144,7 @@ const Dashboard = () => {
                   ))}
                 </tbody>
               </table>
-            </div>
-          )}
+          </div>
         </>
       )}
 

@@ -143,7 +143,7 @@ const EltReporting = () => {
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-slate-900">ELT Reporting</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Company-wide operations across Master Run Cuts, Deployment, and Network Success for any date range.
+          Company-wide operations across Master Run Cuts and Deployment for any date range.
         </p>
       </div>
 
@@ -232,12 +232,6 @@ const EltReporting = () => {
               <p className="text-sm text-slate-500">Revenue Hours At Risk</p>
               <p className="mt-2 text-2xl font-semibold text-amber-600">{num(ns.revenueHoursAtRisk)}</p>
             </div>
-            <StatCard label="Avg OTP" value={pct(ns.avgOtp)} priorValue={pns?.avgOtp} isPct />
-            <StatCard label="Avg SHF" value={pct(ns.avgShf)} priorValue={pns?.avgShf} isPct />
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-sm text-slate-500">Avg TPSH</p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900">{num(ns.avgTpsh)}</p>
-            </div>
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <p className="text-sm text-slate-500">Total Closures</p>
               <p className={`mt-2 text-2xl font-semibold ${ns.totalClosures > 0 ? "text-red-600" : "text-slate-900"}`}>
@@ -245,18 +239,34 @@ const EltReporting = () => {
               </p>
             </div>
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-sm text-slate-500">Providers Failing Target</p>
-              <p className="mt-2 text-2xl font-semibold text-amber-600">
-                {ns.providersFailingOtp + ns.providersFailingShf + ns.providersFailingTpsh > 0
-                  ? `OTP ${ns.providersFailingOtp} · SHF ${ns.providersFailingShf} · TPSH ${ns.providersFailingTpsh}`
-                  : "0"}
+              <p className="text-sm text-slate-500">Late to First</p>
+              <p className={`mt-2 text-2xl font-semibold ${ns.totalLateFirst > 0 ? "text-red-600" : "text-slate-900"}`}>
+                {num(ns.totalLateFirst)}
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-sm text-slate-500">Late Deploy</p>
+              <p className={`mt-2 text-2xl font-semibold ${ns.totalLateDeploy > 0 ? "text-red-600" : "text-slate-900"}`}>
+                {num(ns.totalLateDeploy)}
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-sm text-slate-500">Unassigned Routes</p>
+              <p className={`mt-2 text-2xl font-semibold ${ns.unassignedRoutesCount > 0 ? "text-amber-600" : "text-slate-900"}`}>
+                {num(ns.unassignedRoutesCount)}
               </p>
             </div>
           </div>
 
           <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
             <TrendChart title="Run Cut Fulfillment Trend" points={report.trend} valueKey="runCutFulfillmentPct" formatValue={pct} />
-            <TrendChart title="Avg OTP Trend" points={report.trend} valueKey="avgOtp" color="#0891b2" formatValue={pct} />
+            <TrendChart
+              title="Revenue Hour Fulfillment Trend"
+              points={report.trend}
+              valueKey="revenueHourFulfillmentPct"
+              color="#0891b2"
+              formatValue={pct}
+            />
           </div>
 
           <div className="mb-6 overflow-x-auto rounded-xl border border-slate-200 bg-white">
@@ -267,10 +277,9 @@ const EltReporting = () => {
                   <SortableHeader label="Run Cut Fulfillment" sortKey="runCutFulfillmentPct" sort={sort} setSort={setSort} />
                   <SortableHeader label="Revenue Hour Fulfillment" sortKey="revenueHourFulfillmentPct" sort={sort} setSort={setSort} />
                   <SortableHeader label="Hrs At Risk" sortKey="revenueHoursAtRisk" sort={sort} setSort={setSort} />
-                  <SortableHeader label="Avg OTP" sortKey="avgOtp" sort={sort} setSort={setSort} />
-                  <SortableHeader label="Avg SHF" sortKey="avgShf" sort={sort} setSort={setSort} />
-                  <SortableHeader label="Avg TPSH" sortKey="avgTpsh" sort={sort} setSort={setSort} />
                   <SortableHeader label="Closures" sortKey="totalClosures" sort={sort} setSort={setSort} />
+                  <SortableHeader label="Late to First" sortKey="totalLateFirst" sort={sort} setSort={setSort} />
+                  <SortableHeader label="Late Deploy" sortKey="totalLateDeploy" sort={sort} setSort={setSort} />
                   <SortableHeader label="Unassigned Routes" sortKey="unassignedRoutesCount" sort={sort} setSort={setSort} />
                 </tr>
               </thead>
@@ -287,11 +296,14 @@ const EltReporting = () => {
                     <td className={`px-3 py-2 ${d.revenueHoursAtRisk > 0 ? "text-amber-600" : "text-slate-600"}`}>
                       {num(d.revenueHoursAtRisk)}
                     </td>
-                    <td className="px-3 py-2 text-slate-600">{pct(d.avgOtp)}</td>
-                    <td className="px-3 py-2 text-slate-600">{pct(d.avgShf)}</td>
-                    <td className="px-3 py-2 text-slate-600">{num(d.avgTpsh)}</td>
                     <td className={`px-3 py-2 ${d.totalClosures > 0 ? "text-red-600" : "text-slate-600"}`}>
                       {num(d.totalClosures)}
+                    </td>
+                    <td className={`px-3 py-2 ${d.totalLateFirst > 0 ? "text-red-600" : "text-slate-600"}`}>
+                      {num(d.totalLateFirst)}
+                    </td>
+                    <td className={`px-3 py-2 ${d.totalLateDeploy > 0 ? "text-red-600" : "text-slate-600"}`}>
+                      {num(d.totalLateDeploy)}
                     </td>
                     <td className={`px-3 py-2 ${d.unassignedRoutesCount > 0 ? "text-amber-600" : "text-slate-600"}`}>
                       {num(d.unassignedRoutesCount)}
@@ -300,37 +312,6 @@ const EltReporting = () => {
                 ))}
               </tbody>
             </table>
-          </div>
-
-          <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6">
-            <h2 className="mb-4 text-sm font-semibold text-slate-900">Provider Performance — Below Target</h2>
-            {report.providersBelowTarget.length === 0 ? (
-              <p className="text-sm text-slate-400">No providers below target in this range.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-slate-200 text-sm">
-                  <thead>
-                    <tr>
-                      {["Division", "Provider", "Failed KPIs", "Composite"].map((h) => (
-                        <th key={h} className="px-3 py-2 text-left font-medium text-slate-500">
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {report.providersBelowTarget.map((p, i) => (
-                      <tr key={i}>
-                        <td className="px-3 py-2 text-slate-600">{p.divisionName}</td>
-                        <td className="px-3 py-2 font-medium text-slate-900">{p.provider}</td>
-                        <td className="px-3 py-2 text-red-600">{p.failedKpis.join(", ")}</td>
-                        <td className="px-3 py-2 text-slate-600">{p.composite ?? "—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-white p-6">

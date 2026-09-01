@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useOutletContext } from "react-router-dom";
+import { useOutletContext } from "react-router-dom";
 import { apiGet } from "../../api/client";
 import { DAYS_OF_WEEK } from "../../utils/dates";
 import { useLatestRequest } from "../../hooks/useLatestRequest";
@@ -140,12 +140,6 @@ const TrackerDashboard = () => {
             Finalized weekly summary
           </span>
         )}
-        <Link
-          to={`/network-success/dashboard?division=${selectedDivision._id}`}
-          className="ml-auto text-sm text-brand-600 hover:underline"
-        >
-          View KPI rankings in Network Success →
-        </Link>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">

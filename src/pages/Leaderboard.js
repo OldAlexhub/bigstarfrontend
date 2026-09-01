@@ -1,10 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { apiGet, API_BASE } from "../api/client";
 import { toISODate, addDays, todayInTimezone } from "../utils/dates";
 import { useLatestRequest } from "../hooks/useLatestRequest";
+import MetricCard from "../components/MetricCard";
 
 const pct = (v) => (v == null ? "—" : `${Math.round(v * 1000) / 10}%`);
 const num = (v) => (v == null ? "—" : v);
+
+const RANK_MEDALS = { 1: "🥇", 2: "🥈", 3: "🥉" };
 
 const Leaderboard = () => {
   // Company-wide report — no single division's timezone applies, so the
@@ -65,13 +69,21 @@ const Leaderboard = () => {
     }
   };
 
+  const summary = useMemo(() => {
+    if (!data?.divisions?.length) return null;
+    const top = data.divisions[0];
+    const totalIssues = data.divisions.reduce((s, d) => s + d.issueCount, 0);
+    const totalHoursAtRisk = data.divisions.reduce((s, d) => s + (d.revenueHoursAtRisk || 0), 0);
+    return { top, totalIssues, totalHoursAtRisk: Math.round(totalHoursAtRisk * 100) / 100 };
+  }, [data]);
+
   return (
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-slate-900">Leaderboard</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Top 20 operators company-wide, ranked on one uniform scoring standard across every division, for any date
-          range.
+          Every division ranked by fulfillment — run cut and revenue hour coverage, plus issues logged by Deployment —
+          for any date range.
         </p>
       </div>
 
@@ -109,41 +121,65 @@ const Leaderboard = () => {
       {error && <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
       {loading && <p className="text-sm text-slate-500">Loading…</p>}
 
+      {!loading && summary && (
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <MetricCard label="Top Division" value={summary.top.name} tone="good" sub={pct(summary.top.avgFulfillmentPct)} />
+          <MetricCard label="Issues Logged Company-Wide" value={num(summary.totalIssues)} tone="info" />
+          <MetricCard
+            label="Revenue Hours At Risk Company-Wide"
+            value={num(summary.totalHoursAtRisk)}
+            tone={summary.totalHoursAtRisk > 0 ? "warning" : "neutral"}
+          />
+        </div>
+      )}
+
       {!loading && data && (
         <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-50">
               <tr>
-                {["Rank", "Operator", "Division(s)", "Provider", "OTP", "SHF", "TPSH", "Closures", "Late 1st", "Late Dep", "Score"].map(
-                  (h) => (
-                    <th key={h} className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-500">
-                      {h}
-                    </th>
-                  )
-                )}
+                {[
+                  "Rank",
+                  "Division",
+                  "Run Cut Fulfillment",
+                  "Revenue Hour Fulfillment",
+                  "Avg Fulfillment",
+                  "Issues Logged",
+                  "Revenue Hours At Risk",
+                ].map((h) => (
+                  <th key={h} className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-500">
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {data.operators.length === 0 && (
+              {data.divisions.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="px-4 py-6 text-center text-slate-400">
-                    No operators had any scheduled or reported activity in this range.
+                  <td colSpan={7} className="px-4 py-6 text-center text-slate-400">
+                    No divisions accessible in this range.
                   </td>
                 </tr>
               )}
-              {data.operators.map((r) => (
-                <tr key={r.kpiKey}>
-                  <td className="whitespace-nowrap px-3 py-2 font-medium text-slate-900">{r.rank}</td>
-                  <td className="whitespace-nowrap px-3 py-2 font-medium text-slate-900">{r.operator}</td>
-                  <td className="whitespace-nowrap px-3 py-2 text-slate-600">{r.divisions}</td>
-                  <td className="whitespace-nowrap px-3 py-2 text-slate-600">{r.provider}</td>
-                  <td className={`whitespace-nowrap px-3 py-2 ${r.meetsOtp ? "text-slate-600" : "text-red-600"}`}>{pct(r.avgOtp)}</td>
-                  <td className={`whitespace-nowrap px-3 py-2 ${r.meetsShf ? "text-slate-600" : "text-red-600"}`}>{pct(r.avgShf)}</td>
-                  <td className={`whitespace-nowrap px-3 py-2 ${r.meetsTpsh ? "text-slate-600" : "text-red-600"}`}>{num(r.avgTpsh)}</td>
-                  <td className="whitespace-nowrap px-3 py-2 text-slate-600">{num(r.avgRouteClosures)}</td>
-                  <td className="whitespace-nowrap px-3 py-2 text-slate-600">{num(r.avgLateFirst)}</td>
-                  <td className="whitespace-nowrap px-3 py-2 text-slate-600">{num(r.avgLateDeploy)}</td>
-                  <td className="whitespace-nowrap px-3 py-2 font-semibold text-slate-900">{pct(r.composite)}</td>
+              {data.divisions.map((d) => (
+                <tr key={d.divisionId}>
+                  <td className="whitespace-nowrap px-3 py-2 font-medium text-slate-900">
+                    {RANK_MEDALS[d.rank] || d.rank}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2 font-medium text-slate-900">
+                    <Link to={`/master-run-cuts?division=${d.divisionId}`} className="hover:underline">
+                      {d.name}
+                    </Link>
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2 text-slate-600">{pct(d.runCutFulfillmentPct)}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-slate-600">{pct(d.revenueHourFulfillmentPct)}</td>
+                  <td className="whitespace-nowrap px-3 py-2 font-semibold text-slate-900">{pct(d.avgFulfillmentPct)}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-slate-600">{num(d.issueCount)}</td>
+                  <td
+                    className={`whitespace-nowrap px-3 py-2 ${d.revenueHoursAtRisk > 0 ? "text-amber-600" : "text-slate-600"}`}
+                  >
+                    {num(d.revenueHoursAtRisk)}
+                  </td>
                 </tr>
               ))}
             </tbody>

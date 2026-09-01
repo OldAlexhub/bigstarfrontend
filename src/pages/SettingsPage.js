@@ -95,12 +95,6 @@ const SettingsPage = () => {
         <p className="mt-1 text-sm text-slate-500">
           Break duration and revenue-hour ratio thresholds used to calculate run cut hours.
         </p>
-        <p className="mt-2 text-sm">
-          Looking for Network Success's KPI thresholds and weights instead?{" "}
-          <Link to="/network-success/settings" className="text-brand-600 hover:underline">
-            Go to Network Success Settings →
-          </Link>
-        </p>
         {isELT && (
           <p className="mt-2 text-sm">
             <Link to="/settings/users" className="text-brand-600 hover:underline">
