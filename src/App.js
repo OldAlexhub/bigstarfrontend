@@ -27,6 +27,7 @@ import MonthlyAnalytics from "./pages/network-success/MonthlyAnalytics";
 import NsSettingsPage from "./pages/network-success/NsSettingsPage";
 import EmailTemplates from "./pages/network-success/EmailTemplates";
 import EltReporting from "./pages/EltReporting";
+import Leaderboard from "./pages/Leaderboard";
 import UserAdmin from "./pages/UserAdmin";
 
 function App() {
@@ -63,6 +64,7 @@ function App() {
             <Route path="email-templates" element={<EmailTemplates />} />
           </Route>
           <Route path="/elt-reporting" element={<EltReporting />} />
+          <Route path="/leaderboard" element={<Leaderboard />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/settings/users" element={<UserAdmin />} />
         </Route>

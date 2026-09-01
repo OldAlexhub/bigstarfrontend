@@ -83,6 +83,9 @@ const DailyKpiUpload = () => {
           routeClosures: String(r.routeClosures),
           lateToFirst: String(r.lateToFirst),
           lateDeploy: String(r.lateDeploy),
+          schedHours: r.schedHours == null ? "" : String(r.schedHours),
+          provider: r.provider ?? "",
+          operator: r.operator ?? "",
         }))
       );
       setPreviewWarnings(data.warnings || []);
@@ -156,8 +159,9 @@ const DailyKpiUpload = () => {
         <p className="mb-4 text-sm text-slate-500">
           Upload the Daily KPI Tracker workbook straight from Provider Management and skip
           retyping the numbers. Review the results below before anything is saved — Route
-          Closures/Late to First/Late Deploy here are only used when Deployment has no record of
-          a route/day at all; otherwise Deployment's own numbers stay authoritative.
+          Closures/Late to First/Late Deploy/Scheduled Hours/Provider here are only used when
+          Deployment has no record of a route/day at all (e.g. historical dates); otherwise
+          Deployment's own numbers stay authoritative.
         </p>
 
         <div className="mb-4 flex flex-wrap items-end gap-4">
@@ -229,6 +233,9 @@ const DailyKpiUpload = () => {
                       "Route Closures",
                       "Late to First",
                       "Late Deploy",
+                      "Scheduled Hrs (fallback)",
+                      "Provider (fallback)",
+                      "Operator (fallback)",
                       "",
                     ].map((h) => (
                       <th key={h} className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-500">
@@ -240,7 +247,7 @@ const DailyKpiUpload = () => {
                 <tbody className="divide-y divide-slate-100">
                   {previewRows.length === 0 && (
                     <tr>
-                      <td colSpan={9} className="px-3 py-4 text-center text-slate-400">
+                      <td colSpan={12} className="px-3 py-4 text-center text-slate-400">
                         Nothing to import - every row was skipped. See the warnings above.
                       </td>
                     </tr>
@@ -317,6 +324,31 @@ const DailyKpiUpload = () => {
                         />
                       </td>
                       <td className="px-2 py-1">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={row.schedHours}
+                          onChange={(e) => updatePreviewRow(i, "schedHours", e.target.value)}
+                          className="w-20 rounded border border-slate-300 px-1.5 py-1 text-sm"
+                        />
+                      </td>
+                      <td className="px-2 py-1">
+                        <input
+                          type="text"
+                          value={row.provider}
+                          onChange={(e) => updatePreviewRow(i, "provider", e.target.value)}
+                          className="w-32 rounded border border-slate-300 px-1.5 py-1 text-sm"
+                        />
+                      </td>
+                      <td className="px-2 py-1">
+                        <input
+                          type="text"
+                          value={row.operator}
+                          onChange={(e) => updatePreviewRow(i, "operator", e.target.value)}
+                          className="w-32 rounded border border-slate-300 px-1.5 py-1 text-sm"
+                        />
+                      </td>
+                      <td className="px-2 py-1">
                         <button onClick={() => removePreviewRow(i)} className="text-xs text-red-600 hover:underline">
                           Remove
                         </button>
@@ -385,13 +417,36 @@ const DailyKpiUpload = () => {
               const fulfillment = row.schedHrs > 0 ? row.actualHrs / row.schedHrs : null;
               const tpsh = row.actualHrs > 0 ? row.totalTrips / row.actualHrs : null;
               const fromUpload = row.closuresSource === "upload";
+              const isGap = row.closuresSource === "schedule-gap";
               return (
-                <tr key={row.entryId}>
+                <tr
+                  key={row.entryId || `${row.routeSource}-${row.date}`}
+                  className={isGap ? "bg-red-50/60" : undefined}
+                  title={isGap ? "Scheduled to run but no data was uploaded for this day - counted as a closure." : undefined}
+                >
                   <td className="whitespace-nowrap px-3 py-2 text-slate-600">{row.date}</td>
-                  <td className="whitespace-nowrap px-3 py-2 text-slate-600">{row.operator}</td>
-                  <td className="whitespace-nowrap px-3 py-2 text-slate-600">{row.provider}</td>
+                  <td
+                    className="whitespace-nowrap px-3 py-2 text-slate-600"
+                    title={fromUpload ? "From the uploaded tracker (Deployment has no record for this route/day)" : "From Deployment"}
+                  >
+                    {row.operator}
+                    {fromUpload && <span className="ml-1 text-xs text-blue-500">↑</span>}
+                  </td>
+                  <td
+                    className="whitespace-nowrap px-3 py-2 text-slate-600"
+                    title={fromUpload ? "From the uploaded tracker (Deployment has no record for this route/day)" : "From Deployment"}
+                  >
+                    {row.provider}
+                    {fromUpload && <span className="ml-1 text-xs text-blue-500">↑</span>}
+                  </td>
                   <td className="whitespace-nowrap px-3 py-2 font-medium text-slate-900">{row.routeSource}</td>
-                  <td className="whitespace-nowrap px-3 py-2 text-slate-600">{round2(row.schedHrs)}</td>
+                  <td
+                    className="whitespace-nowrap px-3 py-2 text-slate-600"
+                    title={fromUpload ? "From the uploaded tracker (Deployment has no record for this route/day)" : "From Deployment"}
+                  >
+                    {round2(row.schedHrs)}
+                    {fromUpload && <span className="ml-1 text-xs text-blue-500">↑</span>}
+                  </td>
                   <td className="whitespace-nowrap px-3 py-2 text-slate-600">{round2(row.actualHrs)}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-slate-600">{pct(fulfillment)}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-slate-600">{row.totalTrips}</td>
@@ -419,9 +474,13 @@ const DailyKpiUpload = () => {
                     {fromUpload && <span className="ml-1 text-xs text-blue-500">↑</span>}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2">
-                    <button onClick={() => handleDelete(row.entryId)} className="text-xs text-red-600 hover:underline">
-                      Remove
-                    </button>
+                    {row.entryId ? (
+                      <button onClick={() => handleDelete(row.entryId)} className="text-xs text-red-600 hover:underline">
+                        Remove
+                      </button>
+                    ) : (
+                      <span className="text-xs text-slate-400">closed (no upload)</span>
+                    )}
                   </td>
                 </tr>
               );

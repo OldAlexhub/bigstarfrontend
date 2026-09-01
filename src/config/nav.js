@@ -3,6 +3,7 @@ export const NAV_ITEMS = [
   { key: "deployment", label: "Deployment", path: "/deployment" },
   { key: "network_success", label: "Network Success", path: "/network-success" },
   { key: "elt_reporting", label: "ELT Reporting", path: "/elt-reporting" },
+  { key: "leaderboard", label: "Leaderboard", path: "/leaderboard" },
 ];
 
 export const canAccess = (user, key) =>
