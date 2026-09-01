@@ -7,6 +7,7 @@ const TABS = [
   { to: "/deployment/issue-log", label: "Issue Log", end: false },
   { to: "/deployment/client-report", label: "Client Report", end: false },
   { to: "/deployment/reporting", label: "Reporting", end: false },
+  { to: "/deployment/tracker-log", label: "Tracker Log", end: false },
 ];
 
 const tabClasses = ({ isActive }) =>

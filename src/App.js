@@ -12,6 +12,7 @@ import LiveSchedule from "./pages/deployment/LiveSchedule";
 import IssueLog from "./pages/deployment/IssueLog";
 import ClientReport from "./pages/deployment/ClientReport";
 import Reporting from "./pages/deployment/Reporting";
+import ActivityLog from "./pages/deployment/ActivityLog";
 import EltReporting from "./pages/EltReporting";
 import Leaderboard from "./pages/Leaderboard";
 import UserAdmin from "./pages/UserAdmin";
@@ -33,6 +34,7 @@ function App() {
             <Route path="issue-log" element={<IssueLog />} />
             <Route path="client-report" element={<ClientReport />} />
             <Route path="reporting" element={<Reporting />} />
+            <Route path="tracker-log" element={<ActivityLog />} />
           </Route>
           <Route path="/elt-reporting" element={<EltReporting />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
