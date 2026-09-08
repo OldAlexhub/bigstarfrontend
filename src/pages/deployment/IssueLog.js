@@ -274,7 +274,7 @@ const IssueLog = () => {
                 <td className="px-3 py-2 text-slate-600">{issue.notes || "—"}</td>
                 <td className="px-3 py-2">
                   {issue.autoSyncTag ? (
-                    <span className="text-xs text-slate-400" title="Auto-synced from the route's live status — change it from Deployment's Live Schedule instead.">
+                    <span className="text-xs text-slate-400" title="Auto-synced from the route's live day — change it from Deployment's Live Schedule instead.">
                       (auto)
                     </span>
                   ) : (
