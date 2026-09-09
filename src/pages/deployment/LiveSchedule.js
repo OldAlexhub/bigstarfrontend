@@ -5,7 +5,7 @@ import { toISODate, todayInTimezone, addDays } from "../../utils/dates";
 import RunCutDayTable from "../../components/RunCutDayTable";
 import { useLatestRequest } from "../../hooks/useLatestRequest";
 
-const StandbyPanel = ({ selectedDivision, targetDate, which, coverableRoutes }) => {
+const StandbyPanel = ({ selectedDivision, targetDate, which, coverableRoutes, onCoverageChanged }) => {
   const [standbyDays, setStandbyDays] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -38,6 +38,7 @@ const StandbyPanel = ({ selectedDivision, targetDate, which, coverableRoutes }) 
         coveringRoute: routeId || undefined,
       });
       setStandbyDays((prev) => prev.map((r) => (r._id === rcd._id ? data.runCutDay : r)));
+      onCoverageChanged?.();
     } catch (err) {
       setError(err.message);
     }
@@ -397,12 +398,13 @@ const LiveSchedule = () => {
           savingId={savingId}
           onPatch={handlePatch}
           onRemoveExtra={handleRemoveExtra}
+          showDisposition={which === "today"}
           emptyMessage={`No routes scheduled for ${which}.`}
         />
       )}
 
       <p className="mt-3 text-xs text-slate-400">
-        Operator, vehicle, and schedule come from Master Run Cuts. Status, disruption, and client notes set here
+        Operator, vehicle, and schedule come from Master Run Cuts. Status, disruption, client notes, and disposition set here
         apply to {which === "today" ? "today" : "tomorrow"} only and don't change the ongoing schedule.
       </p>
 
@@ -412,6 +414,7 @@ const LiveSchedule = () => {
           targetDate={targetDate}
           which={which}
           coverableRoutes={rows}
+          onCoverageChanged={load}
         />
       )}
     </div>

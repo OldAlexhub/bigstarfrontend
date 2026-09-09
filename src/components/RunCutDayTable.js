@@ -1,4 +1,5 @@
 import { DISRUPTION_TYPES } from "../config/disruptionTypes";
+import { DISPOSITION_OPTIONS } from "../config/dispositions";
 import { DAYS_OF_WEEK } from "../utils/dates";
 
 const STATUS_OPTIONS = [
@@ -49,6 +50,7 @@ const COLUMN_WIDTHS = {
   "Revenue Hrs": 68,
   "Client Notes": 120,
   Disruption: 112,
+  Disposition: 138,
   Flags: 120,
   Days: 186,
   Actions: 60,
@@ -60,6 +62,7 @@ const RunCutDayTable = ({
   onPatch,
   emptyMessage,
   showDisruptionAndNotes = true,
+  showDisposition = false,
   editableAssignment = false,
   operators = [],
   vehicles = [],
@@ -78,6 +81,7 @@ const RunCutDayTable = ({
     "Service Hrs",
     "Revenue Hrs",
     ...(showDisruptionAndNotes ? ["Client Notes", "Disruption"] : []),
+    ...(showDisposition ? ["Disposition"] : []),
     ...(editableAssignment ? ["Flags", "Days"] : []),
     ...(onRemoveExtra ? ["Actions"] : []),
   ];
@@ -270,6 +274,32 @@ const RunCutDayTable = ({
                     </select>
                   </td>
                 </>
+              )}
+              {showDisposition && (
+                <td className="px-2 py-2">
+                  <select
+                    value={rc.disposition || ""}
+                    disabled={savingId === rc._id || rc.dispositionSource === "standby"}
+                    onChange={(e) => onPatch(rc, { disposition: e.target.value || null })}
+                    title={
+                      rc.dispositionSource === "standby"
+                        ? "Automatically set by standby coverage"
+                        : "Final outcome for this route"
+                    }
+                    className={`w-full whitespace-nowrap rounded-md border px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-brand-500 ${
+                      rc.dispositionSource === "standby"
+                        ? "border-blue-200 bg-blue-50 text-blue-700"
+                        : "border-slate-200 bg-white text-slate-700"
+                    }`}
+                  >
+                    <option value="">Not dispositioned</option>
+                    {DISPOSITION_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </td>
               )}
               {editableAssignment && (
                 <td className="px-2 py-2">

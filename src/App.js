@@ -13,6 +13,7 @@ import IssueLog from "./pages/deployment/IssueLog";
 import ClientReport from "./pages/deployment/ClientReport";
 import Reporting from "./pages/deployment/Reporting";
 import ActivityLog from "./pages/deployment/ActivityLog";
+import StandbyUtilization from "./pages/deployment/StandbyUtilization";
 import EltReporting from "./pages/EltReporting";
 import Leaderboard from "./pages/Leaderboard";
 import UserAdmin from "./pages/UserAdmin";
@@ -31,6 +32,7 @@ function App() {
           </Route>
           <Route path="/deployment" element={<DeploymentLayout />}>
             <Route index element={<LiveSchedule />} />
+            <Route path="standby-utilization" element={<StandbyUtilization />} />
             <Route path="issue-log" element={<IssueLog />} />
             <Route path="client-report" element={<ClientReport />} />
             <Route path="reporting" element={<Reporting />} />

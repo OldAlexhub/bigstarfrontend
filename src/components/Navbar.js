@@ -1,6 +1,7 @@
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { NAV_ITEMS, canAccess } from "../config/nav";
+import logo from "../assets/logo.png";
 
 const linkClasses = ({ isActive }) =>
   `whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium transition-colors ${
@@ -17,9 +18,9 @@ const Navbar = () => {
     <nav className="border-b border-slate-200 bg-white print:hidden">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <div className="flex min-w-0 items-center gap-6">
-          <span className="shrink-0 text-lg font-bold tracking-tight text-brand-700">
-            BigStar
-          </span>
+          <NavLink to="/dashboard" className="shrink-0" aria-label="Big Star Transit dashboard">
+            <img src={logo} alt="Big Star Transit" className="h-10 w-auto" />
+          </NavLink>
           <div className="flex items-center gap-1 overflow-x-auto">
             <NavLink to="/dashboard" className={linkClasses}>
               Dashboard

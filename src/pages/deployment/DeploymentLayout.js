@@ -4,6 +4,7 @@ import { apiGet } from "../../api/client";
 
 const TABS = [
   { to: "/deployment", label: "Live Schedule", end: true },
+  { to: "/deployment/standby-utilization", label: "STBY Utilization", end: false },
   { to: "/deployment/issue-log", label: "Issue Log", end: false },
   { to: "/deployment/client-report", label: "Client Report", end: false },
   { to: "/deployment/reporting", label: "Reporting", end: false },
