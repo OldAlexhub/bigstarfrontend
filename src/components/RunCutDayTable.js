@@ -279,16 +279,24 @@ const RunCutDayTable = ({
                 <td className="px-2 py-2">
                   <select
                     value={rc.disposition || ""}
-                    disabled={savingId === rc._id || rc.dispositionSource === "standby"}
+                    disabled={
+                      savingId === rc._id ||
+                      rc.dispositionSource === "standby" ||
+                      rc.dispositionSource === "status"
+                    }
                     onChange={(e) => onPatch(rc, { disposition: e.target.value || null })}
                     title={
                       rc.dispositionSource === "standby"
                         ? "Automatically set by standby coverage"
+                        : rc.dispositionSource === "status"
+                        ? "Automatically set by Suspended status"
                         : "Final outcome for this route"
                     }
                     className={`w-full whitespace-nowrap rounded-md border px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-brand-500 ${
                       rc.dispositionSource === "standby"
                         ? "border-blue-200 bg-blue-50 text-blue-700"
+                        : rc.dispositionSource === "status"
+                        ? "border-red-200 bg-red-50 text-red-700"
                         : "border-slate-200 bg-white text-slate-700"
                     }`}
                   >
