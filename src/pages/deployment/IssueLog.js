@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useOutletContext, useSearchParams } from "react-router-dom";
 import { apiGet, apiPost, apiPatch, apiDelete } from "../../api/client";
-import { toISODate, todayInTimezone } from "../../utils/dates";
+import { toISODate, todayInTimezone, addDays } from "../../utils/dates";
 import { DISRUPTION_TYPES } from "../../config/disruptionTypes";
+import { useLatestRequest } from "../../hooks/useLatestRequest";
 
 const inputClasses =
   "rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500";
@@ -27,6 +28,11 @@ const IssueLog = () => {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [from, setFrom] = useState(
+    toISODate(addDays(todayInTimezone(selectedDivision?.timezone), -6))
+  );
+  const [to, setTo] = useState(toISODate(todayInTimezone(selectedDivision?.timezone)));
+  const { begin, isCurrent } = useLatestRequest();
 
   const [form, setForm] = useState(emptyForm(selectedDivision?.timezone));
 
@@ -51,26 +57,33 @@ const IssueLog = () => {
   };
 
   const load = () => {
-    if (!selectedDivision) return;
+    if (!selectedDivision || !from || !to) return;
+    const requestId = begin();
     setLoading(true);
     setError("");
     Promise.all([
       apiGet(`/api/routes?division=${selectedDivision._id}`),
       apiGet("/api/operators"),
-      apiGet(`/api/daily-issues?division=${selectedDivision._id}`),
+      apiGet(`/api/daily-issues?division=${selectedDivision._id}&from=${from}&to=${to}`),
       apiGet(`/api/run-cuts?division=${selectedDivision._id}`),
     ])
       .then(([routesData, operatorsData, issuesData, runCutsData]) => {
+        if (!isCurrent(requestId)) return;
         setRoutes(routesData.routes);
         setOperators(operatorsData.operators);
         setIssues(issuesData.issues);
         setRunCuts(runCutsData.runCuts);
       })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (isCurrent(requestId)) setError(err.message);
+      })
+      .finally(() => {
+        if (isCurrent(requestId)) setLoading(false);
+      });
   };
 
-  useEffect(load, [selectedDivision]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(load, [selectedDivision, from, to]);
 
   const filteredIssues = routeCodeFilter
     ? issues.filter((i) => i.route?.code === routeCodeFilter)
@@ -238,6 +251,27 @@ const IssueLog = () => {
           </button>
         </p>
       )}
+
+      <div className="mb-4 flex flex-wrap items-end gap-3">
+        <label className="text-sm text-slate-600">
+          From
+          <input
+            type="date"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            className={`${inputClasses} mt-1 block`}
+          />
+        </label>
+        <label className="text-sm text-slate-600">
+          To
+          <input
+            type="date"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            className={`${inputClasses} mt-1 block`}
+          />
+        </label>
+      </div>
 
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
         <table className="min-w-full divide-y divide-slate-200 text-sm">

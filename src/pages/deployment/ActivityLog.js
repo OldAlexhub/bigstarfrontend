@@ -4,6 +4,8 @@ import { apiGet } from "../../api/client";
 import { toISODate, todayInTimezone, addDays } from "../../utils/dates";
 import { useLatestRequest } from "../../hooks/useLatestRequest";
 
+export const TRACKER_LOG_PAGE_SIZE = 15;
+
 // Multi-term, cross-field search: every space-separated word in the query
 // must appear somewhere in the entry (user name, username, action, or
 // summary), but each word can match a different field — so "gad suspended"
@@ -22,6 +24,7 @@ const ActivityLog = () => {
   const [to, setTo] = useState(toISODate(todayInTimezone(selectedDivision?.timezone)));
   const [search, setSearch] = useState("");
   const [entries, setEntries] = useState([]);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const { begin, isCurrent } = useLatestRequest();
@@ -45,6 +48,14 @@ const ActivityLog = () => {
   }, [selectedDivision, from, to]);
 
   const filteredEntries = useMemo(() => entries.filter((entry) => matchesSearch(entry, search)), [entries, search]);
+  const totalPages = Math.max(1, Math.ceil(filteredEntries.length / TRACKER_LOG_PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageStart = (currentPage - 1) * TRACKER_LOG_PAGE_SIZE;
+  const paginatedEntries = filteredEntries.slice(pageStart, pageStart + TRACKER_LOG_PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(1);
+  }, [selectedDivision, from, to, search]);
 
   return (
     <div>
@@ -116,7 +127,7 @@ const ActivityLog = () => {
                 </td>
               </tr>
             )}
-            {filteredEntries.map((entry) => (
+            {paginatedEntries.map((entry) => (
               <tr key={entry._id}>
                 <td className="whitespace-nowrap px-3 py-2 text-slate-600">
                   {new Date(entry.createdAt).toLocaleString()}
@@ -130,6 +141,50 @@ const ActivityLog = () => {
           </tbody>
         </table>
       </div>
+
+      {filteredEntries.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm">
+          <p className="text-slate-500">
+            Showing {pageStart + 1}–{Math.min(pageStart + TRACKER_LOG_PAGE_SIZE, filteredEntries.length)} of{" "}
+            {filteredEntries.length}
+          </p>
+          {totalPages > 1 && (
+            <nav className="flex flex-wrap items-center gap-1" aria-label="Tracker Log pages">
+              <button
+                type="button"
+                onClick={() => setPage((value) => Math.max(1, value - 1))}
+                disabled={currentPage === 1}
+                className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Previous
+              </button>
+              {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => (
+                <button
+                  key={pageNumber}
+                  type="button"
+                  aria-current={currentPage === pageNumber ? "page" : undefined}
+                  onClick={() => setPage(pageNumber)}
+                  className={`min-w-8 rounded-md px-2.5 py-1 font-medium ${
+                    currentPage === pageNumber
+                      ? "bg-brand-500 text-white"
+                      : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                  }`}
+                >
+                  {pageNumber}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+                disabled={currentPage === totalPages}
+                className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next
+              </button>
+            </nav>
+          )}
+        </div>
+      )}
     </div>
   );
 };

@@ -103,9 +103,15 @@ const emptyExtra = {
   notes: "",
 };
 
+export const splitRowsByDisposition = (runCutDays) => ({
+  open: runCutDays.filter((runCutDay) => !runCutDay.disposition),
+  closed: runCutDays.filter((runCutDay) => Boolean(runCutDay.disposition)),
+});
+
 const LiveSchedule = () => {
   const { selectedDivision } = useOutletContext();
   const [which, setWhich] = useState("today");
+  const [todayView, setTodayView] = useState("open");
   const [rows, setRows] = useState([]);
   const [routes, setRoutes] = useState([]);
   const [operators, setOperators] = useState([]);
@@ -200,6 +206,8 @@ const LiveSchedule = () => {
   const sortedRows = [...rows].sort((a, b) =>
     String(a.route?.code).localeCompare(String(b.route?.code), undefined, { numeric: true })
   );
+  const todayRows = splitRowsByDisposition(sortedRows);
+  const visibleRows = which === "today" ? todayRows[todayView] : sortedRows;
 
   const handlePatch = async (runCutDay, patch) => {
     setSavingId(runCutDay._id);
@@ -390,16 +398,44 @@ const LiveSchedule = () => {
 
       {error && <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
 
+      {which === "today" && !loading && (
+        <div className="mb-3 flex gap-1" role="tablist" aria-label="Today's route status">
+          {[
+            { key: "open", label: "Open", count: todayRows.open.length },
+            { key: "closed", label: "Closed", count: todayRows.closed.length },
+          ].map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              role="tab"
+              aria-selected={todayView === option.key}
+              onClick={() => setTodayView(option.key)}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                todayView === option.key
+                  ? "bg-slate-800 text-white"
+                  : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              {option.label} ({option.count})
+            </button>
+          ))}
+        </div>
+      )}
+
       {loading ? (
         <p className="text-sm text-slate-500">Loading…</p>
       ) : (
         <RunCutDayTable
-          rows={sortedRows}
+          rows={visibleRows}
           savingId={savingId}
           onPatch={handlePatch}
           onRemoveExtra={handleRemoveExtra}
           showDisposition={which === "today"}
-          emptyMessage={`No routes scheduled for ${which}.`}
+          emptyMessage={
+            which === "today"
+              ? `No ${todayView} routes scheduled for today.`
+              : "No routes scheduled for tomorrow."
+          }
         />
       )}
 
