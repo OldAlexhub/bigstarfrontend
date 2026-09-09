@@ -147,9 +147,10 @@ test("every nonblank disposition is closed", () => {
     { disposition: "deployed_late" },
     { disposition: "deployed_stby" },
     { disposition: "reallocated" },
+    { disposition: "closed_suspended" },
   ];
 
   const split = splitRowsByDisposition(rows);
   expect(split.open).toHaveLength(1);
-  expect(split.closed).toHaveLength(4);
+  expect(split.closed).toHaveLength(5);
 });

@@ -190,13 +190,19 @@ const Reporting = () => {
 
       <section className="mb-8">
         <h2 className="mb-3 text-sm font-semibold text-slate-900">Disposition Summary</h2>
-        <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
           {DISPOSITION_OPTIONS.map((option) => (
             <MetricCard
               key={option.value}
               label={option.label}
               value={dispositionCounts[option.value] || 0}
-              tone={option.value === "deployed_late" ? "warning" : "info"}
+              tone={
+                option.value === "closed_suspended"
+                  ? "bad"
+                  : option.value === "deployed_late"
+                  ? "warning"
+                  : "info"
+              }
             />
           ))}
         </div>
