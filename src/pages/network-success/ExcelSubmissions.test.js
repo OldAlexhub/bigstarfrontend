@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { apiFormPost, apiGet, apiPost } from "../../api/client";
+import { apiDelete, apiFormPost, apiGet, apiPost } from "../../api/client";
 import ExcelSubmissions from "./ExcelSubmissions";
 
-jest.mock("../../api/client", () => ({ apiFormPost: jest.fn(), apiGet: jest.fn(), apiPost: jest.fn() }));
+jest.mock("../../api/client", () => ({ apiDelete: jest.fn(), apiFormPost: jest.fn(), apiGet: jest.fn(), apiPost: jest.fn() }));
 
 const pending = {
   id: "submission-1",
@@ -46,4 +46,84 @@ test("guided workflow blocks final review until an unresolved route is mapped or
   fireEvent.click(next);
   expect(screen.getByText("Review what will be saved")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Confirm and save" })).toBeEnabled();
+});
+
+test("recent submissions can be removed and re-uploaded", async () => {
+  const confirmed = {
+    id: "submission-1",
+    source: "vision",
+    status: "confirmed",
+    createdAt: "2026-09-10T12:00:00.000Z",
+    division: { code: "DIV_6", name: "Division 6 - LYNX" },
+  };
+  apiGet.mockResolvedValueOnce({ submissions: [confirmed] }).mockResolvedValue({ submissions: [] });
+  apiDelete.mockResolvedValue({ message: "Submission removed. You can upload the corrected files again now." });
+
+  render(<ExcelSubmissions />);
+  expect(await screen.findByText("Division 6 - LYNX", { exact: false })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+  expect(screen.getByRole("dialog", { name: "Remove this submission?" })).toBeInTheDocument();
+  expect(apiDelete).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Remove submission" }));
+
+  await waitFor(() => expect(apiDelete).toHaveBeenCalledWith("/api/network-success/submissions/submission-1"));
+  expect(await screen.findByRole("status")).toHaveTextContent("Submission removed");
+});
+
+test("a confirmed submission opens as an editable revision with fresh matching", async () => {
+  const confirmed = {
+    id: "submission-1",
+    source: "vision",
+    status: "confirmed",
+    createdAt: "2026-09-10T12:00:00.000Z",
+    division: { _id: "division-1", code: "DIV_6", name: "Division 6 - LYNX" },
+  };
+  const revision = {
+    ...pending,
+    id: "revision-1",
+    source: "vision",
+    division: "division-1",
+    reopenedFrom: "submission-1",
+  };
+  const matchedRevision = { ...revision, status: "matched" };
+  apiGet.mockResolvedValue({ submissions: [confirmed] });
+  apiPost.mockImplementation((url) => {
+    if (url === "/api/network-success/submissions/submission-1/reopen") {
+      return Promise.resolve({ submission: revision, reopened: true });
+    }
+    if (url === "/api/network-success/submissions/revision-1/preview") {
+      return Promise.resolve({
+        submission: matchedRevision,
+        routes: [{ id: "route-1", code: "1037", type: "standard" }],
+        existingKeys: ["2026-09-08|route-1"],
+        rows: [{
+          id: "v1",
+          severity: "clean",
+          date: "2026-09-08",
+          sourceRoute: "1037A",
+          completedTrips: 8,
+          matchedRouteId: "route-1",
+          matchedRoute: "1037",
+          suggestions: [],
+          matchReason: "Unique safe letter insertion/deletion match",
+          sourceOperator: null,
+          operatorName: "Operator One",
+          providerName: null,
+          operationalOutcome: "Operated",
+          deployment: { provenance: {}, lateToFirst: 0, lateDeploy: 0 },
+        }],
+      });
+    }
+    return Promise.reject(new Error(`Unexpected request: ${url}`));
+  });
+
+  render(<ExcelSubmissions />);
+  expect(await screen.findByText("Division 6 - LYNX", { exact: false })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Open" }));
+
+  await waitFor(() => expect(apiPost).toHaveBeenCalledWith("/api/network-success/submissions/submission-1/reopen", {}));
+  await waitFor(() => expect(apiPost).toHaveBeenCalledWith("/api/network-success/submissions/revision-1/preview", { division: "division-1" }));
+  expect(await screen.findByText("Confirm the division, then review matches")).toBeInTheDocument();
+  expect(screen.getByText("1037A")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Review final changes" })).toBeEnabled();
 });

@@ -24,7 +24,7 @@ const DeltaBadge = ({ current, prior, higherIsBetter = true }) => {
   );
 };
 
-const StatCard = ({ label, value, priorValue, isPct, higherIsBetter = true }) => (
+const StatCard = ({ label, value, priorValue, isPct, higherIsBetter = true, note }) => (
   <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
     <p className="text-sm text-slate-500">{label}</p>
     <p className="mt-2 text-2xl font-semibold text-slate-900">
@@ -33,6 +33,7 @@ const StatCard = ({ label, value, priorValue, isPct, higherIsBetter = true }) =>
         <DeltaBadge current={value === "—" ? null : parseFloat(value) / 100} prior={priorValue} higherIsBetter={higherIsBetter} />
       )}
     </p>
+    {note && <p className="mt-1 text-xs text-slate-500">{note}</p>}
   </div>
 );
 
@@ -143,7 +144,7 @@ const EltReporting = () => {
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-slate-900">ELT Reporting</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Company-wide operations across Master Run Cuts and Deployment for any date range.
+          Company-wide operations across Master Run Cuts, Deployment, and confirmed Network Success submissions.
         </p>
       </div>
 
@@ -223,13 +224,22 @@ const EltReporting = () => {
           <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             <StatCard label="Run Cut Fulfillment" value={pct(ns.runCutFulfillmentPct)} priorValue={pns?.runCutFulfillmentPct} isPct />
             <StatCard
-              label="Revenue Hour Fulfillment"
-              value={pct(ns.revenueHourFulfillmentPct)}
-              priorValue={pns?.revenueHourFulfillmentPct}
+              label="Planned Revenue Hour Fulfillment"
+              value={pct(ns.plannedRevenueHourFulfillmentPct)}
+              priorValue={pns?.plannedRevenueHourFulfillmentPct}
               isPct
             />
+            <StatCard
+              label="Actual Revenue Hour Fulfillment"
+              value={pct(ns.actualRevenueHourFulfillmentPct)}
+              priorValue={pns?.actualRevenueHourFulfillmentPct}
+              isPct
+              note={ns.actualRevenueComparableRouteDays
+                ? `${ns.actualRevenueComparableRouteDays} route-day${ns.actualRevenueComparableRouteDays === 1 ? "" : "s"} with uploaded revenue hours`
+                : "No uploaded revenue-hour data in this range"}
+            />
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-sm text-slate-500">Revenue Hours At Risk</p>
+              <p className="text-sm text-slate-500">Planned Revenue Hours At Risk</p>
               <p className="mt-2 text-2xl font-semibold text-amber-600">{num(ns.revenueHoursAtRisk)}</p>
             </div>
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -261,7 +271,7 @@ const EltReporting = () => {
           <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
             <TrendChart title="Run Cut Fulfillment Trend" points={report.trend} valueKey="runCutFulfillmentPct" formatValue={pct} />
             <TrendChart
-              title="Revenue Hour Fulfillment Trend"
+              title="Planned Revenue Hour Fulfillment Trend"
               points={report.trend}
               valueKey="revenueHourFulfillmentPct"
               color="#0891b2"
@@ -275,7 +285,8 @@ const EltReporting = () => {
                 <tr>
                   <SortableHeader label="Division" sortKey="name" sort={sort} setSort={setSort} />
                   <SortableHeader label="Run Cut Fulfillment" sortKey="runCutFulfillmentPct" sort={sort} setSort={setSort} />
-                  <SortableHeader label="Revenue Hour Fulfillment" sortKey="revenueHourFulfillmentPct" sort={sort} setSort={setSort} />
+                  <SortableHeader label="Planned Revenue Hour Fulfillment" sortKey="plannedRevenueHourFulfillmentPct" sort={sort} setSort={setSort} />
+                  <SortableHeader label="Actual Revenue Hour Fulfillment" sortKey="actualRevenueHourFulfillmentPct" sort={sort} setSort={setSort} />
                   <SortableHeader label="Hrs At Risk" sortKey="revenueHoursAtRisk" sort={sort} setSort={setSort} />
                   <SortableHeader label="Closures" sortKey="totalClosures" sort={sort} setSort={setSort} />
                   <SortableHeader label="Late to First" sortKey="totalLateFirst" sort={sort} setSort={setSort} />
@@ -292,7 +303,13 @@ const EltReporting = () => {
                       </Link>
                     </td>
                     <td className="px-3 py-2 text-slate-600">{pct(d.runCutFulfillmentPct)}</td>
-                    <td className="px-3 py-2 text-slate-600">{pct(d.revenueHourFulfillmentPct)}</td>
+                    <td className="px-3 py-2 text-slate-600">{pct(d.plannedRevenueHourFulfillmentPct)}</td>
+                    <td className="px-3 py-2 text-slate-600">
+                      <span className="block">{pct(d.actualRevenueHourFulfillmentPct)}</span>
+                      {d.actualRevenueComparableRouteDays > 0 && (
+                        <span className="block whitespace-nowrap text-xs text-slate-400">{d.actualRevenueComparableRouteDays} uploaded route-day{d.actualRevenueComparableRouteDays === 1 ? "" : "s"}</span>
+                      )}
+                    </td>
                     <td className={`px-3 py-2 ${d.revenueHoursAtRisk > 0 ? "text-amber-600" : "text-slate-600"}`}>
                       {num(d.revenueHoursAtRisk)}
                     </td>

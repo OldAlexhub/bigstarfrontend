@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { apiFormPost, apiGet, apiPost } from "../../api/client";
+import { apiDelete, apiFormPost, apiGet, apiPost } from "../../api/client";
 
 const STEPS = ["Upload", "Match", "Review & Save"];
 const sources = {
@@ -189,7 +189,43 @@ const MatchRow = ({ row, routes, resolution, setResolution, expanded, setExpande
   );
 };
 
-const History = ({ submissions }) => (
+const RemoveSubmissionDialog = ({ item, busy, error, onCancel, onConfirm }) => {
+  if (!item) return null;
+  const confirmed = item.status === "confirmed";
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4" role="presentation" onMouseDown={() => { if (!busy) onCancel(); }}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="remove-submission-title"
+        aria-describedby="remove-submission-description"
+        className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50 text-lg font-semibold text-red-600">!</div>
+        <h2 id="remove-submission-title" className="mt-4 text-lg font-semibold text-slate-900">Remove this submission?</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          <span className="font-medium capitalize text-slate-700">{item.source}</span>
+          {item.division ? ` · ${item.division.code} · ${item.division.name}` : " · Division not confirmed"}
+        </p>
+        <p id="remove-submission-description" className="mt-4 text-sm leading-6 text-slate-600">
+          {confirmed
+            ? "Its active Network Success records will also be removed from Performance and ELT Reporting. The audit will remain, and you can upload corrected files afterward."
+            : "This unfinished submission will be discarded. You can upload the files again afterward."}
+        </p>
+        {error && <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+        <div className="mt-6 flex justify-end gap-3">
+          <button type="button" autoFocus disabled={busy} onClick={onCancel} className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50">Cancel</button>
+          <button type="button" disabled={busy} onClick={onConfirm} className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">
+            {busy ? "Removing…" : "Remove submission"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const History = ({ submissions, onOpen, onRemove, openingId, removingId }) => (
   <section className="mt-8">
     <div className="mb-3 flex items-center justify-between">
       <h2 className="text-base font-semibold text-slate-900">Recent submissions</h2>
@@ -201,12 +237,30 @@ const History = ({ submissions }) => (
       ) : (
         <div className="divide-y divide-slate-100">
           {submissions.map((item) => (
-            <div key={item.id || item._id} className="grid gap-2 px-4 py-3 text-sm sm:grid-cols-[100px_1fr_150px_120px] sm:items-center">
+            <div key={item.id || item._id} className="grid gap-2 px-4 py-3 text-sm sm:grid-cols-[100px_1fr_180px_100px_auto] sm:items-center">
               <span className="font-medium capitalize text-slate-800">{item.source}</span>
               <span className="text-slate-600">{item.division ? `${item.division.code} · ${item.division.name}` : "Division not confirmed"}</span>
               <span className="text-slate-500">{new Date(item.confirmedAt || item.createdAt).toLocaleString()}</span>
               <span className={`justify-self-start rounded-full px-2 py-1 text-xs font-medium ${item.status === "confirmed" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
                 {item.status}
+              </span>
+              <span className="flex items-center gap-3">
+                <button
+                  type="button"
+                  disabled={Boolean(openingId || removingId)}
+                  onClick={() => onOpen(item)}
+                  className="text-xs font-medium text-brand-600 hover:underline disabled:opacity-50"
+                >
+                  {openingId === (item.id || item._id) ? "Opening…" : "Open"}
+                </button>
+                <button
+                  type="button"
+                  disabled={Boolean(openingId || removingId)}
+                  onClick={() => onRemove(item)}
+                  className="text-xs font-medium text-red-600 hover:underline disabled:opacity-50"
+                >
+                  {removingId === (item.id || item._id) ? "Removing…" : "Remove"}
+                </button>
               </span>
             </div>
           ))}
@@ -228,11 +282,24 @@ const ExcelSubmissions = () => {
   const [expanded, setExpanded] = useState(null);
   const [history, setHistory] = useState([]);
   const [success, setSuccess] = useState(null);
+  const [pendingRemoval, setPendingRemoval] = useState(null);
+  const [removalError, setRemovalError] = useState("");
+  const [openingId, setOpeningId] = useState(null);
+  const [removingId, setRemovingId] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
   const loadHistory = () => apiGet("/api/network-success/submissions").then((data) => setHistory(data.submissions || [])).catch(() => {});
   useEffect(() => { loadHistory(); }, []);
+  useEffect(() => {
+    if (!pendingRemoval) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape" && !removingId) setPendingRemoval(null);
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [pendingRemoval, removingId]);
 
   const requiredFilesReady = sources[source].files.every((file) => files[file.key]);
   const setFile = (key, file) => {
@@ -360,7 +427,71 @@ const ExcelSubmissions = () => {
   };
 
   const reset = () => {
-    setStep(1); setSubmission(null); setPreview(null); setResolutions({}); setExcludedDates([]); setFiles({}); setSuccess(null); setError("");
+    setStep(1); setSubmission(null); setPreview(null); setResolutions({}); setExcludedDates([]); setFiles({}); setSuccess(null); setError(""); setNotice("");
+  };
+
+  const requestRemoval = (item) => {
+    setError("");
+    setNotice("");
+    setRemovalError("");
+    setPendingRemoval(item);
+  };
+
+  const openHistorySubmission = async (item) => {
+    const submissionId = item.id || item._id;
+    setOpeningId(submissionId);
+    setError("");
+    setNotice("");
+    try {
+      const data = await apiPost(`/api/network-success/submissions/${submissionId}/reopen`, {});
+      const opened = data.submission;
+      const divisionId = (typeof opened.division === "object"
+        ? opened.division?._id
+        : opened.division) || opened.divisionCandidates?.[0]?.division || "";
+      setSource(opened.source);
+      setFiles({});
+      setSubmission(opened);
+      setDivision(divisionId);
+      setPreview(null);
+      setResolutions({});
+      setExcludedDates([]);
+      setSuccess(null);
+      setStep(2);
+      if (divisionId) {
+        const matchData = await apiPost(`/api/network-success/submissions/${opened.id}/preview`, { division: divisionId });
+        setSubmission(matchData.submission);
+        setPreview(matchData);
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setOpeningId(null);
+    }
+  };
+
+  const removeHistorySubmission = async () => {
+    const item = pendingRemoval;
+    if (!item) return;
+    const submissionId = item.id || item._id;
+    setRemovingId(submissionId);
+    setError("");
+    setNotice("");
+    setRemovalError("");
+    try {
+      const data = await apiDelete(`/api/network-success/submissions/${submissionId}`);
+      setHistory((current) => current.filter((entry) => (entry.id || entry._id) !== submissionId));
+      if (success?.submission?.id === submissionId) {
+        setSuccess(null);
+        setStep(1);
+      }
+      setNotice(data.message);
+      setPendingRemoval(null);
+      await loadHistory();
+    } catch (err) {
+      setRemovalError(err.message);
+    } finally {
+      setRemovingId(null);
+    }
   };
 
   if (success) {
@@ -385,7 +516,8 @@ const ExcelSubmissions = () => {
             </button>
           </div>
         </section>
-        <History submissions={history} />
+        <History submissions={history} onOpen={openHistorySubmission} onRemove={requestRemoval} openingId={openingId} removingId={removingId} />
+        <RemoveSubmissionDialog item={pendingRemoval} busy={Boolean(removingId)} error={removalError} onCancel={() => setPendingRemoval(null)} onConfirm={removeHistorySubmission} />
       </Fragment>
     );
   }
@@ -395,6 +527,7 @@ const ExcelSubmissions = () => {
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
         <Stepper current={step} />
         {error && <div role="alert" className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+        {notice && <div role="status" className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</div>}
 
         {step === 1 && (
           <div className="mx-auto max-w-3xl">
@@ -565,7 +698,8 @@ const ExcelSubmissions = () => {
           </div>
         )}
       </section>
-      {step === 1 && <History submissions={history} />}
+      {step === 1 && <History submissions={history} onOpen={openHistorySubmission} onRemove={requestRemoval} openingId={openingId} removingId={removingId} />}
+      <RemoveSubmissionDialog item={pendingRemoval} busy={Boolean(removingId)} error={removalError} onCancel={() => setPendingRemoval(null)} onConfirm={removeHistorySubmission} />
     </Fragment>
   );
 };

@@ -12,7 +12,7 @@ const request = async (path, options = {}) => {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(data.message || "Request failed");
+    throw new Error(data.message || `Request failed (${res.status})`);
   }
   return data;
 };
