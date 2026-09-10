@@ -7,6 +7,7 @@ const ROLES = ["ELT", "VP", "Director", "Sr Manager", "Manager", "Coordinator"];
 const SECTIONS = [
   { key: "master_run_cuts", label: "Master Run Cuts" },
   { key: "deployment", label: "Deployment" },
+  { key: "network_success", label: "Network Success" },
 ];
 
 const emptyForm = {

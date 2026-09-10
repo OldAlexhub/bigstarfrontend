@@ -1,6 +1,6 @@
 # BigStar Operations Client
 
-The React web client for Big Star Transit's operations platform. It provides the authenticated Dashboard, Master Run Cuts, Deployment, ELT Reporting, Leaderboard, Settings, and User Administration interfaces.
+The React web client for Big Star Transit's operations platform. It provides the authenticated Dashboard, Master Run Cuts, Deployment, Network Success Excel Submissions and Performance analysis, ELT Reporting, Leaderboard, Settings, and User Administration interfaces.
 
 For the current operational specification, see [BigStar-Operations-Guide.md](../BigStar-Operations-Guide.md).
 

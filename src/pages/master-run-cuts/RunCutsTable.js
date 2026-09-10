@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
-import { apiGet, apiPost, apiPatch } from "../../api/client";
+import { apiDelete, apiGet, apiPost, apiPatch } from "../../api/client";
 import RunCutDayTable from "../../components/RunCutDayTable";
 import { useLatestRequest } from "../../hooks/useLatestRequest";
 import { DAYS_OF_WEEK } from "../../utils/dates";
 
 const emptyNewRoute = {
   code: "",
+  type: "standard",
   operatorName: "",
   vehicleCode: "",
   pulloutAddress: "",
@@ -118,11 +119,14 @@ const RunCutsTable = () => {
     if (!newRoute.code.trim() || !selectedDivision) return;
     setAddingRoute(true);
     setAddRouteError("");
+    let createdRouteId = null;
     try {
       const routeData = await apiPost("/api/routes", {
         division: selectedDivision._id,
         code: newRoute.code.trim(),
+        type: newRoute.type,
       });
+      createdRouteId = routeData.route._id;
       await apiPost("/api/run-cuts", {
         division: selectedDivision._id,
         route: routeData.route._id,
@@ -138,9 +142,38 @@ const RunCutsTable = () => {
       setShowAddRoute(false);
       load();
     } catch (err) {
+      if (createdRouteId) await apiDelete(`/api/routes/${createdRouteId}`).catch(() => {});
       setAddRouteError(err.message);
     } finally {
       setAddingRoute(false);
+    }
+  };
+
+  const handleRoutePatch = async (runCut, patch) => {
+    setSavingId(runCut._id);
+    setError("");
+    try {
+      const data = await apiPatch(`/api/routes/${runCut.route._id}`, patch);
+      setRunCuts((current) => current.map((row) => row._id === runCut._id ? { ...row, route: { ...row.route, ...data.route } } : row));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const handleDeleteRoute = async (runCut) => {
+    const routeCode = runCut.route?.code || "this route";
+    if (!window.confirm(`Remove ${routeCode} from Master Run Cuts? Future scheduled days will be removed; past history will be kept.`)) return;
+    setSavingId(runCut._id);
+    setError("");
+    try {
+      await apiDelete(`/api/routes/${runCut.route._id}`);
+      setRunCuts((current) => current.filter((row) => row._id !== runCut._id));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSavingId(null);
     }
   };
 
@@ -179,10 +212,28 @@ const RunCutsTable = () => {
               Route code
               <input
                 value={newRoute.code}
-                onChange={(e) => setNewRoute({ ...newRoute, code: e.target.value })}
+                onChange={(e) => {
+                  const code = e.target.value;
+                  setNewRoute({
+                    ...newRoute,
+                    code,
+                    type: /(?:\bSTBY\b|\bSTANDBY\b)/i.test(code) ? "standby" : newRoute.type,
+                  });
+                }}
                 required
-                className="mt-1 block w-24 rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                className="mt-1 block w-36 rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
               />
+            </label>
+            <label className="text-sm text-slate-600">
+              Route type
+              <select
+                value={newRoute.type}
+                onChange={(e) => setNewRoute({ ...newRoute, type: e.target.value })}
+                className="mt-1 block w-28 rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              >
+                <option value="standard">Standard</option>
+                <option value="standby">Standby</option>
+              </select>
             </label>
             <label className="text-sm text-slate-600">
               Operator
@@ -274,6 +325,8 @@ const RunCutsTable = () => {
           operators={operators}
           vehicles={vehicles}
           showDivisionColumn={isAllDivisions}
+          onRoutePatch={handleRoutePatch}
+          onDeleteRoute={isAllDivisions ? undefined : handleDeleteRoute}
         />
       )}
     </div>

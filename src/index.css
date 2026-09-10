@@ -16,11 +16,8 @@ code {
     monospace;
 }
 
-/* Report pages (End-of-Day Brief, Weekly Report, Provider Check-In,
-   Provider Performance Review) hide the navbar and Network Success's own
-   picker/tab chrome via print:hidden; this resets the constrained content
-   width so a printed report uses the full page and keeps table rows from
-   splitting across a page break. */
+/* Report views hide navigation with print:hidden; this resets the
+   constrained content width and keeps table rows from splitting. */
 @media print {
   main {
     max-width: none !important;

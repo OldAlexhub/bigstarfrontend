@@ -40,6 +40,7 @@ const toggleDay = (days, day) =>
 const COLUMN_WIDTHS = {
   Division: 90,
   Route: 150,
+  Type: 92,
   Operator: 130,
   Vehicle: 64,
   "Pullout Address": 150,
@@ -67,11 +68,16 @@ const RunCutDayTable = ({
   operators = [],
   vehicles = [],
   onRemoveExtra,
+  onRoutePatch,
+  onDeleteRoute,
   showDivisionColumn = false,
+  editableStatus = true,
+  editableDisposition = true,
 }) => {
   const headers = [
     ...(showDivisionColumn ? ["Division"] : []),
     "Route",
+    ...(editableAssignment ? ["Type"] : []),
     "Operator",
     "Vehicle",
     "Pullout Address",
@@ -83,7 +89,7 @@ const RunCutDayTable = ({
     ...(showDisruptionAndNotes ? ["Client Notes", "Disruption"] : []),
     ...(showDisposition ? ["Disposition"] : []),
     ...(editableAssignment ? ["Flags", "Days"] : []),
-    ...(onRemoveExtra ? ["Actions"] : []),
+    ...(onRemoveExtra || onDeleteRoute ? ["Actions"] : []),
   ];
   const tableWidth = headers.reduce((sum, h) => sum + COLUMN_WIDTHS[h], 0);
 
@@ -146,6 +152,20 @@ const RunCutDayTable = ({
                   </span>
                 )}
               </td>
+              {editableAssignment && (
+                <td className="px-2 py-2">
+                  <select
+                    aria-label={`Route type for ${rc.route?.code}`}
+                    value={rc.route?.type || "standard"}
+                    disabled={savingId === rc._id}
+                    onChange={(e) => onRoutePatch?.(rc, { type: e.target.value })}
+                    className="w-full rounded-md border border-slate-200 bg-white px-1.5 py-1 text-xs focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                  >
+                    <option value="standard">Standard</option>
+                    <option value="standby">Standby</option>
+                  </select>
+                </td>
+              )}
               <td className="px-2 py-2">
                 {editableAssignment ? (
                   <input
@@ -228,18 +248,24 @@ const RunCutDayTable = ({
                 )}
               </td>
               <td className="px-2 py-2">
-                <select
-                  value={rc.status}
-                  disabled={savingId === rc._id}
-                  onChange={(e) => onPatch(rc, { status: e.target.value })}
-                  className={`w-full whitespace-nowrap rounded-md border-0 px-1.5 py-1 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-brand-500 ${STATUS_STYLES[rc.status]}`}
-                >
-                  {STATUS_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
+                {editableStatus ? (
+                  <select
+                    value={rc.status}
+                    disabled={savingId === rc._id}
+                    onChange={(e) => onPatch(rc, { status: e.target.value })}
+                    className={`w-full whitespace-nowrap rounded-md border-0 px-1.5 py-1 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-brand-500 ${STATUS_STYLES[rc.status]}`}
+                  >
+                    {STATUS_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${STATUS_STYLES[rc.status] || "bg-slate-100 text-slate-600"}`}>
+                    {STATUS_OPTIONS.find((option) => option.value === rc.status)?.label || rc.status}
+                  </span>
+                )}
               </td>
               <td className="whitespace-nowrap px-2 py-2 text-slate-600">{rc.serviceHours?.toFixed(2)}</td>
               <td className="whitespace-nowrap px-2 py-2 text-slate-600">{rc.revenueHours?.toFixed(2)}</td>
@@ -280,6 +306,7 @@ const RunCutDayTable = ({
                   <select
                     value={rc.disposition || ""}
                     disabled={
+                      !editableDisposition ||
                       savingId === rc._id ||
                       rc.dispositionSource === "standby" ||
                       rc.dispositionSource === "status"
@@ -352,6 +379,17 @@ const RunCutDayTable = ({
                       Remove
                     </button>
                   )}
+                </td>
+              )}
+              {!onRemoveExtra && onDeleteRoute && (
+                <td className="px-2 py-2">
+                  <button
+                    type="button"
+                    onClick={() => onDeleteRoute(rc)}
+                    className="text-xs font-medium text-red-600 hover:underline"
+                  >
+                    Remove
+                  </button>
                 </td>
               )}
             </tr>

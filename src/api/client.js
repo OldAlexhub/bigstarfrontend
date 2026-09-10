@@ -4,9 +4,10 @@
 export const API_BASE = process.env.NODE_ENV === "development" ? "" : process.env.REACT_APP_API_URL || "";
 
 const request = async (path, options = {}) => {
+  const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
   const res = await fetch(`${API_BASE}${path}`, {
     credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    headers: isFormData ? undefined : { "Content-Type": "application/json" },
     ...options,
   });
   const data = await res.json().catch(() => ({}));
@@ -19,6 +20,8 @@ const request = async (path, options = {}) => {
 export const apiGet = (path) => request(path);
 
 export const apiPost = (path, body) => request(path, { method: "POST", body: JSON.stringify(body) });
+
+export const apiFormPost = (path, body) => request(path, { method: "POST", body });
 
 export const apiPatch = (path, body) => request(path, { method: "PATCH", body: JSON.stringify(body) });
 

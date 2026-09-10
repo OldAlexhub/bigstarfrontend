@@ -13,10 +13,14 @@ import IssueLog from "./pages/deployment/IssueLog";
 import ClientReport from "./pages/deployment/ClientReport";
 import Reporting from "./pages/deployment/Reporting";
 import ActivityLog from "./pages/deployment/ActivityLog";
+import ScheduleHistory from "./pages/deployment/ScheduleHistory";
 import StandbyUtilization from "./pages/deployment/StandbyUtilization";
 import EltReporting from "./pages/EltReporting";
 import Leaderboard from "./pages/Leaderboard";
 import UserAdmin from "./pages/UserAdmin";
+import NetworkSuccessLayout from "./pages/network-success/NetworkSuccessLayout";
+import ExcelSubmissions from "./pages/network-success/ExcelSubmissions";
+import NetworkPerformance from "./pages/network-success/NetworkPerformance";
 
 function App() {
   return (
@@ -36,10 +40,15 @@ function App() {
             <Route path="issue-log" element={<IssueLog />} />
             <Route path="client-report" element={<ClientReport />} />
             <Route path="reporting" element={<Reporting />} />
+            <Route path="schedule-history" element={<ScheduleHistory />} />
             <Route path="tracker-log" element={<ActivityLog />} />
           </Route>
           <Route path="/elt-reporting" element={<EltReporting />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
+          <Route path="/network-success" element={<NetworkSuccessLayout />}>
+            <Route index element={<ExcelSubmissions />} />
+            <Route path="performance" element={<NetworkPerformance />} />
+          </Route>
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/settings/users" element={<UserAdmin />} />
         </Route>
