@@ -1,6 +1,7 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { NAV_ITEMS, canAccess } from "../config/nav";
+import { NAV_ITEMS, NAV_FLAT_ITEM_KEYS, NAV_GROUPS, canAccess } from "../config/nav";
+import NavDropdown from "./NavDropdown";
 import logo from "../assets/logo.png";
 
 const linkClasses = ({ isActive }) =>
@@ -10,9 +11,16 @@ const linkClasses = ({ isActive }) =>
       : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
   }`;
 
+const itemsByKey = Object.fromEntries(NAV_ITEMS.map((item) => [item.key, item]));
+
 const Navbar = () => {
   const { user, logout } = useAuth();
-  const visibleItems = NAV_ITEMS.filter((item) => canAccess(user, item.key));
+  const location = useLocation();
+  const flatItems = NAV_FLAT_ITEM_KEYS.map((key) => itemsByKey[key]).filter((item) => canAccess(user, item.key));
+  const visibleGroups = NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.itemKeys.map((key) => itemsByKey[key]).filter((item) => canAccess(user, item.key)),
+  })).filter((group) => group.items.length > 0);
 
   return (
     <nav className="border-b border-slate-200 bg-white print:hidden">
@@ -21,14 +29,22 @@ const Navbar = () => {
           <NavLink to="/dashboard" className="shrink-0" aria-label="Big Star Transit dashboard">
             <img src={logo} alt="Big Star Transit" className="h-10 w-auto" />
           </NavLink>
-          <div className="flex items-center gap-1 overflow-x-auto">
+          <div className="flex items-center gap-1">
             <NavLink to="/dashboard" className={linkClasses}>
               Dashboard
             </NavLink>
-            {visibleItems.map((item) => (
+            {flatItems.map((item) => (
               <NavLink key={item.key} to={item.path} className={linkClasses}>
                 {item.label}
               </NavLink>
+            ))}
+            {visibleGroups.map((group) => (
+              <NavDropdown
+                key={group.key}
+                label={group.label}
+                items={group.items}
+                active={group.items.some((item) => location.pathname.startsWith(item.path))}
+              />
             ))}
             <NavLink to="/settings" className={linkClasses}>
               Settings

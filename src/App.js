@@ -21,6 +21,18 @@ import UserAdmin from "./pages/UserAdmin";
 import NetworkSuccessLayout from "./pages/network-success/NetworkSuccessLayout";
 import ExcelSubmissions from "./pages/network-success/ExcelSubmissions";
 import NetworkPerformance from "./pages/network-success/NetworkPerformance";
+import CustomerServiceLayout from "./pages/customer-service/CustomerServiceLayout";
+import CustomerServiceEntries from "./pages/customer-service/CustomerServiceEntries";
+import CustomerServiceAnalytics from "./pages/customer-service/CustomerServiceAnalytics";
+import SafetyLayout from "./pages/safety/SafetyLayout";
+import SafetyEntries from "./pages/safety/SafetyEntries";
+import SafetyAnalytics from "./pages/safety/SafetyAnalytics";
+import SafetyScores from "./pages/safety/SafetyScores";
+import OperationsReportingLayout from "./pages/operations-reporting/OperationsReportingLayout";
+import KpiTracker from "./pages/operations-reporting/KpiTracker";
+import MonthlyDashboard from "./pages/operations-reporting/MonthlyDashboard";
+import CapQueue from "./pages/operations-reporting/CapQueue";
+import CapReporting from "./pages/operations-reporting/CapReporting";
 
 function App() {
   return (
@@ -48,6 +60,21 @@ function App() {
           <Route path="/network-success" element={<NetworkSuccessLayout />}>
             <Route index element={<ExcelSubmissions />} />
             <Route path="performance" element={<NetworkPerformance />} />
+          </Route>
+          <Route path="/customer-service" element={<CustomerServiceLayout />}>
+            <Route index element={<CustomerServiceEntries />} />
+            <Route path="analytics" element={<CustomerServiceAnalytics />} />
+          </Route>
+          <Route path="/safety" element={<SafetyLayout />}>
+            <Route index element={<SafetyEntries />} />
+            <Route path="scores" element={<SafetyScores />} />
+            <Route path="analytics" element={<SafetyAnalytics />} />
+          </Route>
+          <Route path="/operations-reporting" element={<OperationsReportingLayout />}>
+            <Route index element={<KpiTracker />} />
+            <Route path="dashboard" element={<MonthlyDashboard />} />
+            <Route path="cap" element={<CapQueue />} />
+            <Route path="cap-reporting" element={<CapReporting />} />
           </Route>
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/settings/users" element={<UserAdmin />} />

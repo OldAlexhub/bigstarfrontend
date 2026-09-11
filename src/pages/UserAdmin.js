@@ -8,6 +8,9 @@ const SECTIONS = [
   { key: "master_run_cuts", label: "Master Run Cuts" },
   { key: "deployment", label: "Deployment" },
   { key: "network_success", label: "Network Success" },
+  { key: "customer_service", label: "Customer Service" },
+  { key: "safety", label: "Safety" },
+  { key: "operations_reporting", label: "Operations Reporting" },
 ];
 
 const emptyForm = {
