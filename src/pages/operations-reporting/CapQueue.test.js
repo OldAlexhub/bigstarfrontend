@@ -2,9 +2,9 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { apiDelete, apiGet, apiPatch, apiPost } from "../../api/client";
 import CapQueue from "./CapQueue";
 
-jest.mock("../../api/client", () => ({ apiGet: jest.fn(), apiPatch: jest.fn(), apiPost: jest.fn(), apiDelete: jest.fn() }));
-jest.mock("../../context/AuthContext", () => ({ useAuth: () => ({ user: { _id: "manager-1", role: "ELT" } }) }));
-jest.mock("react-router-dom", () => ({ useLocation: () => ({ state: {} }) }));
+vi.mock("../../api/client", () => ({ apiGet: vi.fn(), apiPatch: vi.fn(), apiPost: vi.fn(), apiDelete: vi.fn() }));
+vi.mock("../../context/AuthContext", () => ({ useAuth: () => ({ user: { _id: "manager-1", role: "ELT" } }) }));
+vi.mock("react-router-dom", () => ({ useLocation: () => ({ state: {} }) }));
 
 const cap = {
   id: "cap-1",
@@ -34,7 +34,7 @@ const cap = {
 };
 
 beforeEach(() => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
   apiGet.mockImplementation((path) => {
     if (path === "/api/divisions") return Promise.resolve({ divisions: [cap.division] });
     if (path === "/api/operations-reporting/people") {

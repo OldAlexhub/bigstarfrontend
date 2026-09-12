@@ -2,10 +2,10 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { apiDelete, apiGet, apiPut } from "../../api/client";
 import CustomerServiceEntries from "./CustomerServiceEntries";
 
-jest.mock("../../api/client", () => ({ apiDelete: jest.fn(), apiGet: jest.fn(), apiPut: jest.fn() }));
+vi.mock("../../api/client", () => ({ apiDelete: vi.fn(), apiGet: vi.fn(), apiPut: vi.fn() }));
 
 beforeEach(() => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
   apiGet.mockImplementation((path) => {
     if (path === "/api/divisions") {
       return Promise.resolve({ divisions: [{ _id: "division-1", code: "D1", name: "Division One" }] });

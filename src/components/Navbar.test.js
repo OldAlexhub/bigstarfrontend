@@ -4,8 +4,8 @@ import Navbar from "./Navbar";
 let mockPathname = "/dashboard";
 let mockUser = { name: "Division Manager", role: "ELT" };
 
-jest.mock("../context/AuthContext", () => ({ useAuth: () => ({ user: mockUser, logout: jest.fn() }) }));
-jest.mock("react-router-dom", () => ({
+vi.mock("../context/AuthContext", () => ({ useAuth: () => ({ user: mockUser, logout: vi.fn() }) }));
+vi.mock("react-router-dom", () => ({
   NavLink: ({ to, children, className, onClick }) => (
     <a href={to} onClick={onClick} className={typeof className === "function" ? className({ isActive: false }) : className}>
       {children}

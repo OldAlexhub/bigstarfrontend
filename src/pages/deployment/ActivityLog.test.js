@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { apiGet } from "../../api/client";
 import ActivityLog, { TRACKER_LOG_PAGE_SIZE } from "./ActivityLog";
 
-jest.mock("react-router-dom", () => {
+vi.mock("react-router-dom", () => {
   const selectedDivision = {
     _id: "division-1",
     name: "Test Division",
@@ -14,7 +14,7 @@ jest.mock("react-router-dom", () => {
   };
 });
 
-jest.mock("../../api/client", () => ({ apiGet: jest.fn() }));
+vi.mock("../../api/client", () => ({ apiGet: vi.fn() }));
 
 const entries = Array.from({ length: 32 }, (_, index) => ({
   _id: `entry-${index + 1}`,

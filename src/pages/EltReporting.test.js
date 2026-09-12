@@ -2,9 +2,9 @@ import { render, screen } from "@testing-library/react";
 import { apiGet } from "../api/client";
 import EltReporting from "./EltReporting";
 
-jest.mock("../api/client", () => ({ apiGet: jest.fn(), API_BASE: "" }));
-jest.mock("../components/TrendChart", () => () => null);
-jest.mock("react-router-dom", () => ({ Link: ({ children }) => <span>{children}</span> }));
+vi.mock("../api/client", () => ({ apiGet: vi.fn(), API_BASE: "" }));
+vi.mock("../components/TrendChart", () => ({ default: () => null }));
+vi.mock("react-router-dom", () => ({ Link: ({ children }) => <span>{children}</span> }));
 
 test("ELT Reporting separates planned and actual revenue-hour fulfillment", async () => {
   apiGet.mockImplementation((path) => {

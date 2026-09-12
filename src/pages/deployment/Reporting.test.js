@@ -3,7 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { apiGet } from "../../api/client";
 import Reporting from "./Reporting";
 
-jest.mock("react-router-dom", () => {
+vi.mock("react-router-dom", () => {
   const selectedDivision = {
     _id: "division-1",
     name: "Test Division",
@@ -12,15 +12,17 @@ jest.mock("react-router-dom", () => {
   return { useOutletContext: () => ({ selectedDivision }) };
 });
 
-jest.mock("../../api/client", () => ({ apiGet: jest.fn(), API_BASE: "" }));
+vi.mock("../../api/client", () => ({ apiGet: vi.fn(), API_BASE: "" }));
 
-jest.mock("../../components/MetricCard", () => function MockMetricCard({ label, value, tone }) {
-  return (
-    <div data-testid={`metric-${label}`} data-tone={tone}>
-      {value}
-    </div>
-  );
-});
+vi.mock("../../components/MetricCard", () => ({
+  default: function MockMetricCard({ label, value, tone }) {
+    return (
+      <div data-testid={`metric-${label}`} data-tone={tone}>
+        {value}
+      </div>
+    );
+  },
+}));
 
 test("Reporting gives Closed/Suspended its own disposition summary card", async () => {
   apiGet.mockImplementation((url) => {

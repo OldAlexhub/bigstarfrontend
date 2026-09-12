@@ -13,15 +13,16 @@ npm ci
 npm start
 ```
 
-The client opens at `http://localhost:3000` and proxies development API requests to `http://localhost:3001`.
+The Vite development server opens at `http://localhost:3000` and proxies development API requests to `http://localhost:3001`.
 
 For a deployed build, set `REACT_APP_API_URL` to the backend origin. Development intentionally uses the local proxy even when that variable is present.
+
+Copy [`.env.example`](.env.example) when creating local environment files. The generated client declares itself as an internal application with `noindex`, `nofollow`, and `noarchive` metadata; `robots.txt` also blocks crawling.
 
 ## Validation and production build
 
 ```powershell
-$env:CI = "true"
-npm test -- --watchAll=false
+npm test
 npm run build
 ```
 
@@ -31,7 +32,7 @@ The production bundle is generated in the ignored `build` directory.
 
 - React 19
 - React Router 7
-- Create React App / React Scripts 5
+- Vite 8 and Vitest 5
 - Tailwind CSS 3
 
 ---

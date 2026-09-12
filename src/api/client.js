@@ -1,7 +1,7 @@
 // Production calls the deployed API configured by REACT_APP_API_URL. In
-// development, always use CRA's local /api proxy so new client and server
+// development, always use Vite's local /api proxy so new client and server
 // changes are tested together instead of silently hitting an older deploy.
-export const API_BASE = process.env.NODE_ENV === "development" ? "" : process.env.REACT_APP_API_URL || "";
+export const API_BASE = import.meta.env.DEV ? "" : import.meta.env.REACT_APP_API_URL || "";
 
 const request = async (path, options = {}) => {
   const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;

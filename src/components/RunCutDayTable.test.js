@@ -16,7 +16,7 @@ test("a status-owned Closed/Suspended disposition is shown and locked", () => {
   render(
     <RunCutDayTable
       rows={[row]}
-      onPatch={jest.fn()}
+      onPatch={vi.fn()}
       showDisposition
       showDisruptionAndNotes={false}
     />
@@ -37,7 +37,7 @@ test("a manual disposition remains editable when the status does not own it", ()
         disposition: "deployed_on_time",
         dispositionSource: "manual",
       }]}
-      onPatch={jest.fn()}
+      onPatch={vi.fn()}
       showDisposition
       showDisruptionAndNotes={false}
     />

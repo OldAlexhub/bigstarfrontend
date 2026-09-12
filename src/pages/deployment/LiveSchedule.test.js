@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { apiGet, apiPatch } from "../../api/client";
 import LiveSchedule, { splitRowsByDisposition } from "./LiveSchedule";
 
-jest.mock("react-router-dom", () => {
+vi.mock("react-router-dom", () => {
   const selectedDivision = {
     _id: "division-1",
     name: "Test Division",
@@ -14,39 +14,36 @@ jest.mock("react-router-dom", () => {
   };
 });
 
-jest.mock("../../api/client", () => ({
-  apiGet: jest.fn(),
-  apiPost: jest.fn(),
-  apiPatch: jest.fn(),
-  apiDelete: jest.fn(),
+vi.mock("../../api/client", () => ({
+  apiGet: vi.fn(),
+  apiPost: vi.fn(),
+  apiPatch: vi.fn(),
+  apiDelete: vi.fn(),
 }));
 
-jest.mock("../../components/RunCutDayTable", () => function MockRunCutDayTable({
-  rows,
-  onPatch,
-  showDisposition,
-  emptyMessage,
-}) {
-  return (
-    <div>
-      <span data-testid="show-disposition">{String(showDisposition)}</span>
-      {rows.length === 0 && <span>{emptyMessage}</span>}
-      {rows.map((row) => (
-        <div key={row._id}>
-          <span>{row.route.code}</span>
-          {showDisposition && (
-            <button
-              type="button"
-              onClick={() => onPatch(row, { disposition: row.disposition ? null : "deployed_on_time" })}
-            >
-              Toggle {row.route.code}
-            </button>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-});
+vi.mock("../../components/RunCutDayTable", () => ({
+  default: function MockRunCutDayTable({ rows, onPatch, showDisposition, emptyMessage }) {
+    return (
+      <div>
+        <span data-testid="show-disposition">{String(showDisposition)}</span>
+        {rows.length === 0 && <span>{emptyMessage}</span>}
+        {rows.map((row) => (
+          <div key={row._id}>
+            <span>{row.route.code}</span>
+            {showDisposition && (
+              <button
+                type="button"
+                onClick={() => onPatch(row, { disposition: row.disposition ? null : "deployed_on_time" })}
+              >
+                Toggle {row.route.code}
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  },
+}));
 
 const originalRows = [
   { _id: "open-1", route: { _id: "route-1", code: "OPEN-1" }, disposition: null },

@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { apiGet } from "../../api/client";
 import SafetyAnalytics from "./SafetyAnalytics";
 
-jest.mock("../../api/client", () => ({ apiGet: jest.fn() }));
+vi.mock("../../api/client", () => ({ apiGet: vi.fn() }));
 
 test("shows monthly preventable and non-preventable rates per 100,000 miles", async () => {
   apiGet.mockImplementation((path) => {

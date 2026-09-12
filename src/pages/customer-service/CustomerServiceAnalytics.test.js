@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { apiGet } from "../../api/client";
 import CustomerServiceAnalytics from "./CustomerServiceAnalytics";
 
-jest.mock("../../api/client", () => ({ apiGet: jest.fn() }));
+vi.mock("../../api/client", () => ({ apiGet: vi.fn() }));
 
 test("shows monthly rates calculated with Network Success trips", async () => {
   apiGet.mockImplementation((path) => {

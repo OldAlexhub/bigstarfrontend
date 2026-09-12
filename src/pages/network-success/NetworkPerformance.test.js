@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { apiGet, apiPatch } from "../../api/client";
 import NetworkPerformance from "./NetworkPerformance";
 
-jest.mock("../../api/client", () => ({ apiGet: jest.fn(), apiPatch: jest.fn() }));
+vi.mock("../../api/client", () => ({ apiGet: vi.fn(), apiPatch: vi.fn() }));
 
 const analysis = {
   summary: { trips: 40, otpPct: 0.95, tpsh: 2.75, closed: 1, partiallyClosed: 0, lateToFirst: 1, lateDeploy: 0, routeDays: 2 },

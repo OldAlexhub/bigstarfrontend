@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { apiDelete, apiFormPost, apiGet, apiPost } from "../../api/client";
 import ExcelSubmissions from "./ExcelSubmissions";
 
-jest.mock("../../api/client", () => ({ apiDelete: jest.fn(), apiFormPost: jest.fn(), apiGet: jest.fn(), apiPost: jest.fn() }));
+vi.mock("../../api/client", () => ({ apiDelete: vi.fn(), apiFormPost: vi.fn(), apiGet: vi.fn(), apiPost: vi.fn() }));
 
 const pending = {
   id: "submission-1",

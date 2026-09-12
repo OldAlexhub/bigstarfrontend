@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { apiGet } from "../../api/client";
 import IssueLog from "./IssueLog";
 
-jest.mock("react-router-dom", () => {
+vi.mock("react-router-dom", () => {
   const selectedDivision = {
     _id: "division-1",
     name: "Test Division",
@@ -12,15 +12,15 @@ jest.mock("react-router-dom", () => {
   const searchParams = new URLSearchParams();
   return {
     useOutletContext: () => ({ selectedDivision }),
-    useSearchParams: () => [searchParams, jest.fn()],
+    useSearchParams: () => [searchParams, vi.fn()],
   };
 });
 
-jest.mock("../../api/client", () => ({
-  apiGet: jest.fn(),
-  apiPost: jest.fn(),
-  apiPatch: jest.fn(),
-  apiDelete: jest.fn(),
+vi.mock("../../api/client", () => ({
+  apiGet: vi.fn(),
+  apiPost: vi.fn(),
+  apiPatch: vi.fn(),
+  apiDelete: vi.fn(),
 }));
 
 test("Issue Log reloads records for the selected From and To dates", async () => {

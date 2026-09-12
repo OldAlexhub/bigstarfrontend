@@ -1,11 +1,12 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { apiGet, apiPatch } from "../../api/client";
 import ScheduleHistory from "./ScheduleHistory";
 
-jest.mock("react-router-dom", () => ({
-  useOutletContext: () => ({ selectedDivision: { _id: "division-1", timezone: "America/New_York" } }),
-}));
-jest.mock("../../api/client", () => ({ apiGet: jest.fn(), apiPatch: jest.fn() }));
+vi.mock("react-router-dom", () => {
+  const selectedDivision = { _id: "division-1", timezone: "America/New_York" };
+  return { useOutletContext: () => ({ selectedDivision }) };
+});
+vi.mock("../../api/client", () => ({ apiGet: vi.fn(), apiPatch: vi.fn() }));
 
 const historicalRow = {
   _id: "day-1",
@@ -32,7 +33,9 @@ test("Schedule History loads one past day and allows disposition-only correction
   expect(date.value).toBe(date.max);
   expect(screen.queryByRole("combobox", { name: /Status/i })).not.toBeInTheDocument();
 
-  fireEvent.change(screen.getByTitle("Final outcome for this route"), { target: { value: "deployed_late" } });
+  await act(async () => {
+    fireEvent.change(screen.getByTitle("Final outcome for this route"), { target: { value: "deployed_late" } });
+  });
   await waitFor(() => expect(apiPatch).toHaveBeenCalledWith("/api/run-cut-days/day-1", { disposition: "deployed_late" }));
-  expect(screen.getByRole("tab", { name: "Dispositioned (1)" })).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole("tab", { name: "Dispositioned (1)" })).toBeInTheDocument());
 });

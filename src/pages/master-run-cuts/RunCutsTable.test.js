@@ -2,10 +2,10 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { apiDelete, apiGet, apiPatch, apiPost } from "../../api/client";
 import RunCutsTable from "./RunCutsTable";
 
-jest.mock("react-router-dom", () => ({
+vi.mock("react-router-dom", () => ({
   useOutletContext: () => ({ selectedDivision: { _id: "division-1", code: "D1", name: "Division One" }, isAllDivisions: false }),
 }));
-jest.mock("../../api/client", () => ({ apiDelete: jest.fn(), apiGet: jest.fn(), apiPatch: jest.fn(), apiPost: jest.fn() }));
+vi.mock("../../api/client", () => ({ apiDelete: vi.fn(), apiGet: vi.fn(), apiPatch: vi.fn(), apiPost: vi.fn() }));
 
 const runCut = {
   _id: "run-cut-1",
@@ -35,7 +35,7 @@ beforeEach(() => {
 });
 
 test("new STBY-labeled routes become standby and existing routes can be removed", async () => {
-  const confirm = jest.spyOn(window, "confirm").mockReturnValue(true);
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
   render(<RunCutsTable />);
   expect(await screen.findByText("R1")).toBeInTheDocument();
 
