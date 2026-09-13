@@ -13,7 +13,7 @@ const OperationsReportingLayout = () => (
     </div>
     <div className="mb-7 flex gap-6 overflow-x-auto border-b border-slate-200">
       <NavLink to="/operations-reporting" end className={tabClasses}>12 Month KPI Tracker</NavLink>
-      <NavLink to="/operations-reporting/dashboard" className={tabClasses}>Month-to-Month Dashboard</NavLink>
+      <NavLink to="/operations-reporting/dashboard" className={tabClasses}>Monthly KPI Snapshot</NavLink>
       <NavLink to="/operations-reporting/cap" className={tabClasses}>CAP</NavLink>
       <NavLink to="/operations-reporting/cap-reporting" className={tabClasses}>CAP Reporting</NavLink>
     </div>

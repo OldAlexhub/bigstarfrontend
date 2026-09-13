@@ -9,7 +9,7 @@ const NetworkSuccessLayout = () => (
         Turn source-system workbooks into reviewed, Deployment-enriched network records.
       </p>
     </div>
-    <div className="mb-7 flex gap-6 border-b border-slate-200">
+    <div className="mb-7 flex gap-6 overflow-x-auto border-b border-slate-200">
       <NavLink
         to="/network-success"
         end
@@ -30,6 +30,26 @@ const NetworkSuccessLayout = () => (
         }
       >
         Performance
+      </NavLink>
+      <NavLink
+        to="/network-success/email-templates"
+        className={({ isActive }) =>
+          `inline-flex shrink-0 border-b-2 px-1 py-3 text-sm font-medium ${
+            isActive ? "border-brand-500 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-700"
+          }`
+        }
+      >
+        Email Templates
+      </NavLink>
+      <NavLink
+        to="/network-success/ld-helper"
+        className={({ isActive }) =>
+          `inline-flex shrink-0 border-b-2 px-1 py-3 text-sm font-medium ${
+            isActive ? "border-brand-500 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-700"
+          }`
+        }
+      >
+        LD Helper
       </NavLink>
     </div>
     <Outlet />

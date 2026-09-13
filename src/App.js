@@ -21,6 +21,8 @@ import UserAdmin from "./pages/UserAdmin";
 import NetworkSuccessLayout from "./pages/network-success/NetworkSuccessLayout";
 import ExcelSubmissions from "./pages/network-success/ExcelSubmissions";
 import NetworkPerformance from "./pages/network-success/NetworkPerformance";
+import EmailTemplates from "./pages/network-success/EmailTemplates";
+import LdHelper from "./pages/network-success/LdHelper";
 import CustomerServiceLayout from "./pages/customer-service/CustomerServiceLayout";
 import CustomerServiceEntries from "./pages/customer-service/CustomerServiceEntries";
 import CustomerServiceAnalytics from "./pages/customer-service/CustomerServiceAnalytics";
@@ -60,6 +62,8 @@ function App() {
           <Route path="/network-success" element={<NetworkSuccessLayout />}>
             <Route index element={<ExcelSubmissions />} />
             <Route path="performance" element={<NetworkPerformance />} />
+            <Route path="email-templates" element={<EmailTemplates />} />
+            <Route path="ld-helper" element={<LdHelper />} />
           </Route>
           <Route path="/customer-service" element={<CustomerServiceLayout />}>
             <Route index element={<CustomerServiceEntries />} />

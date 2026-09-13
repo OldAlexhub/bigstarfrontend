@@ -4,6 +4,10 @@ import NetworkPerformance from "./NetworkPerformance";
 
 vi.mock("../../api/client", () => ({ apiGet: vi.fn(), apiPatch: vi.fn() }));
 
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
 const analysis = {
   summary: { trips: 40, otpPct: 0.95, tpsh: 2.75, closed: 1, partiallyClosed: 0, lateToFirst: 1, lateDeploy: 0, routeDays: 2 },
   insights: ["Trip-weighted OTP is 95.0% across 40 completed trips."],
@@ -44,4 +48,39 @@ test("Performance supports accessible date and provider filters and renders auto
     "/api/network-success/entries/entry-1/assignment",
     { operatorId: "operator-1", reuseAssignment: true }
   ));
+});
+
+test("paginates Needs attention without changing severity order", async () => {
+  const attention = Array.from({ length: 12 }, (_, index) => ({
+    id: `attention-${index + 1}`,
+    severity: index < 3 ? "blocker" : "review",
+    route: `Route ${String(index + 1).padStart(2, "0")}`,
+    date: "2026-09-01",
+    operator: "Operator A",
+    provider: "Unassigned",
+    reasons: ["Late deploy"],
+    trips: 10,
+    otpPct: 0.8,
+  }));
+  apiGet.mockImplementation((path) => {
+    if (path === "/api/divisions") return Promise.resolve({ divisions: [{ _id: "division-1", code: "D1", name: "Division One" }] });
+    if (path === "/api/operators") return Promise.resolve({ operators: [] });
+    return Promise.resolve({ ...analysis, attention });
+  });
+
+  render(<NetworkPerformance />);
+
+  expect(await screen.findByText("Route 01")).toBeInTheDocument();
+  expect(screen.getByText("Route 10")).toBeInTheDocument();
+  expect(screen.queryByText("Route 11")).not.toBeInTheDocument();
+  expect(screen.getByText("Showing 1-10 of 12")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
+
+  fireEvent.click(screen.getByRole("button", { name: "Next" }));
+
+  expect(screen.queryByText("Route 01")).not.toBeInTheDocument();
+  expect(screen.getByText("Route 11")).toBeInTheDocument();
+  expect(screen.getByText("Route 12")).toBeInTheDocument();
+  expect(screen.getByText("Showing 11-12 of 12")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
 });

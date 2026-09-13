@@ -15,6 +15,7 @@ const assignmentSourceLabel = {
   deployment_snapshot: "Deployment snapshot",
   unavailable: "Not assigned",
 };
+const ATTENTION_PAGE_SIZE = 10;
 
 const KpiStrip = ({ summary }) => {
   const cells = [
@@ -49,6 +50,7 @@ const NetworkPerformance = () => {
   const [editingId, setEditingId] = useState(null);
   const [showAllAssignments, setShowAllAssignments] = useState(false);
   const [assignmentForm, setAssignmentForm] = useState({ operatorId: "" });
+  const [attentionPage, setAttentionPage] = useState(1);
   const [savingAssignment, setSavingAssignment] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -60,6 +62,7 @@ const NetworkPerformance = () => {
     try {
       const data = await apiGet(`/api/network-success/performance?${queryString({ division: selectedDivision, ...filters })}`);
       setAnalysis(data);
+      setAttentionPage(1);
       if (adoptBounds) {
         setFrom(data.dateBounds.from || "");
         setTo(data.dateBounds.to || "");
@@ -145,6 +148,12 @@ const NetworkPerformance = () => {
       setSavingAssignment(false);
     }
   };
+
+  const attentionItems = analysis?.attention || [];
+  const attentionPageCount = Math.max(1, Math.ceil(attentionItems.length / ATTENTION_PAGE_SIZE));
+  const currentAttentionPage = Math.min(attentionPage, attentionPageCount);
+  const attentionStart = (currentAttentionPage - 1) * ATTENTION_PAGE_SIZE;
+  const visibleAttentionItems = attentionItems.slice(attentionStart, attentionStart + ATTENTION_PAGE_SIZE);
 
   return (
     <div>
@@ -279,10 +288,20 @@ const NetworkPerformance = () => {
           <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
             <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
               <div><h2 className="font-semibold text-slate-900">Needs attention</h2><p className="text-xs text-slate-500">Automatically ordered by operational severity.</p></div>
-              <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">{analysis.attention.length}</span>
+              <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">{attentionItems.length}</span>
             </div>
-            {analysis.attention.length === 0 ? <p className="px-4 py-6 text-sm text-slate-500">No exceptions were detected.</p> : (
-              <div className="divide-y divide-slate-100">{analysis.attention.map((item) => <div key={item.id} className="grid gap-2 px-4 py-3 text-sm md:grid-cols-[110px_100px_1fr_90px_90px] md:items-center"><span className={`w-fit rounded-full px-2 py-1 text-[11px] font-semibold ${item.severity === "blocker" ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-700"}`}>{item.severity === "blocker" ? "Priority" : "Review"}</span><span className="font-medium text-slate-800">{item.route}</span><span className="text-slate-600">{dateLabel(item.date)} · {item.operator}{item.provider !== "Unassigned" ? ` · ${item.provider}` : ""}<span className="block text-xs text-slate-500">{item.reasons.join(" · ")}</span></span><span className="text-slate-600">{item.trips} trips</span><span className="text-slate-600">{pct(item.otpPct)} OTP</span></div>)}</div>
+            {attentionItems.length === 0 ? <p className="px-4 py-6 text-sm text-slate-500">No exceptions were detected.</p> : (
+              <div className="divide-y divide-slate-100">{visibleAttentionItems.map((item) => <div key={item.id} className="grid gap-2 px-4 py-3 text-sm md:grid-cols-[110px_100px_1fr_90px_90px] md:items-center"><span className={`w-fit rounded-full px-2 py-1 text-[11px] font-semibold ${item.severity === "blocker" ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-700"}`}>{item.severity === "blocker" ? "Priority" : "Review"}</span><span className="font-medium text-slate-800">{item.route}</span><span className="text-slate-600">{dateLabel(item.date)} · {item.operator}{item.provider !== "Unassigned" ? ` · ${item.provider}` : ""}<span className="block text-xs text-slate-500">{item.reasons.join(" · ")}</span></span><span className="text-slate-600">{item.trips} trips</span><span className="text-slate-600">{pct(item.otpPct)} OTP</span></div>)}</div>
+            )}
+            {attentionItems.length > ATTENTION_PAGE_SIZE && (
+              <nav aria-label="Needs attention pagination" className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50 px-4 py-3">
+                <p className="text-xs text-slate-500">Showing {attentionStart + 1}-{Math.min(attentionStart + ATTENTION_PAGE_SIZE, attentionItems.length)} of {attentionItems.length}</p>
+                <div className="flex items-center gap-2">
+                  <button type="button" disabled={currentAttentionPage === 1} onClick={() => setAttentionPage((page) => Math.max(1, page - 1))} className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
+                  <span className="min-w-20 text-center text-xs font-medium text-slate-600">Page {currentAttentionPage} of {attentionPageCount}</span>
+                  <button type="button" disabled={currentAttentionPage === attentionPageCount} onClick={() => setAttentionPage((page) => Math.min(attentionPageCount, page + 1))} className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
+                </div>
+              </nav>
             )}
           </section>
         </div>

@@ -8,7 +8,7 @@ const KpiTracker = () => {
   const initialTo = localMonth();
   const [divisions, setDivisions] = useState([]);
   const [division, setDivision] = useState("");
-  const [from, setFrom] = useState(addMonths(initialTo, -11));
+  const [from, setFrom] = useState(addMonths(initialTo, -2));
   const [to, setTo] = useState(initialTo);
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -52,7 +52,7 @@ const KpiTracker = () => {
           <label className="text-xs font-medium text-slate-600">To month<input type="month" value={to} onChange={(event) => setTo(event.target.value)} className={inputClasses} required /></label>
           <button disabled={loading} className="rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50">{loading ? "Loading…" : "View tracker"}</button>
         </div>
-        <p className="mt-2 text-xs text-slate-400">Select up to 12 months. Current-month values are previews and do not create CAPs.</p>
+        <p className="mt-2 text-xs text-slate-400">Showing the latest 3 months by default. Use the month filters to view up to 12 months. Current-month values are previews and do not create CAPs.</p>
       </form>
 
       {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}

@@ -15,6 +15,7 @@ const jsxInJavaScript = () => ({
 });
 
 export default defineConfig({
+  assetsInclude: ["**/*.oft"],
   envPrefix: ["VITE_", "REACT_APP_"],
   plugins: [jsxInJavaScript(), react()],
   build: {

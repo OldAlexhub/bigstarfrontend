@@ -1,10 +1,14 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { apiGet } from "../../api/client";
-import { inputClasses, monthLabel, statusClasses } from "./reportingUi";
+import { formatKpi, inputClasses, monthLabel, statusClasses, statusLabel } from "./reportingUi";
 
 const dateLabel = (value) => value
   ? new Date(value).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" })
   : "—";
+
+const dateTimeLabel = (value) => value
+  ? new Date(value).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })
+  : "Not available";
 
 const KpiCard = ({ label, value, detail, tone = "text-slate-900" }) => (
   <div className="bg-white px-4 py-4">
@@ -14,6 +18,74 @@ const KpiCard = ({ label, value, detail, tone = "text-slate-900" }) => (
   </div>
 );
 
+const DetailField = ({ label, children }) => (
+  <div>
+    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+    <div className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+      {children || <span className="italic text-slate-400">Not entered</span>}
+    </div>
+  </div>
+);
+
+const CapDetails = ({ cap }) => {
+  const owner = cap.ownerUser?.name || cap.ownerName;
+  const manager = cap.assignedManager?.name;
+
+  return (
+    <div id={`cap-details-${cap.id}`} className="border-t border-slate-200 bg-slate-50 p-4 sm:p-5">
+      <div className="grid gap-4 lg:grid-cols-2">
+        <section className="rounded-lg border border-slate-200 bg-white p-4">
+          <h3 className="text-sm font-semibold text-slate-900">Saved action plan</h3>
+          <div className="mt-4 grid gap-5">
+            <DetailField label="Root cause">{cap.rootCause}</DetailField>
+            <DetailField label="Corrective action">{cap.correctiveAction}</DetailField>
+          </div>
+        </section>
+
+        <section className="rounded-lg border border-slate-200 bg-white p-4">
+          <h3 className="text-sm font-semibold text-slate-900">Ownership and timing</h3>
+          <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+            <DetailField label="CAP manager">{manager}</DetailField>
+            <DetailField label="Action owner">{owner}</DetailField>
+            <DetailField label="Opened">{dateTimeLabel(cap.firstEnteredAt)}</DetailField>
+            <DetailField label="Last saved">{dateTimeLabel(cap.updatedAt)}</DetailField>
+            <DetailField label="Planned recovery">{cap.plannedRecoveryDate ? dateLabel(cap.plannedRecoveryDate) : null}</DetailField>
+            <DetailField label="Recovery confirmed">{cap.dateRecoveryMet ? dateLabel(cap.dateRecoveryMet) : null}</DetailField>
+          </dl>
+        </section>
+      </div>
+
+      <section className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
+        <h3 className="text-sm font-semibold text-slate-900">KPI record</h3>
+        <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+          <DetailField label="Trigger month">{monthLabel(cap.triggerMonth)}</DetailField>
+          <DetailField label="Value when opened">{formatKpi(cap.valueAtCapDate, cap.kpiFormat)}</DetailField>
+          <DetailField label="Target when opened">{formatKpi(cap.targetAtCap, cap.kpiFormat)}</DetailField>
+          <DetailField label="Variance">{formatKpi(cap.varianceAtCap, cap.kpiFormat)}</DetailField>
+          <DetailField label="Latest result">{formatKpi(cap.latestValue, cap.kpiFormat)}</DetailField>
+          <DetailField label="Latest status">{statusLabel(cap.latestKpiStatus)}</DetailField>
+        </dl>
+      </section>
+
+      <section className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
+        <h3 className="text-sm font-semibold text-slate-900">Updates and notes</h3>
+        {cap.updates?.length ? (
+          <div className="mt-3 space-y-3">
+            {cap.updates.map((update, index) => (
+              <article key={update._id || `${cap.id}-update-${index}`} className="rounded-md border border-slate-100 bg-slate-50 px-3 py-3">
+                <p className="whitespace-pre-wrap text-sm leading-6 text-slate-700">{update.text}</p>
+                <p className="mt-1 text-xs text-slate-400">{update.author?.name || "User"} · {dateTimeLabel(update.createdAt)}</p>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-2 text-sm italic text-slate-400">No updates or notes were saved.</p>
+        )}
+      </section>
+    </div>
+  );
+};
+
 const CapReporting = () => {
   const [divisions, setDivisions] = useState([]);
   const [division, setDivision] = useState("");
@@ -21,6 +93,7 @@ const CapReporting = () => {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [report, setReport] = useState(null);
+  const [expandedCapId, setExpandedCapId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -108,20 +181,38 @@ const CapReporting = () => {
                       <th className="px-3 py-2">Owner</th>
                       <th className="px-3 py-2">Planned recovery</th>
                       <th className="px-4 py-2">Recovered</th>
+                      <th className="px-4 py-2 text-right">Details</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {rows.map((cap) => (
-                      <tr key={cap.id}>
-                        <td className="px-4 py-3 font-medium text-slate-900">{cap.division?.code}</td>
-                        <td className="px-3 py-3 text-slate-700">{cap.kpiLabel}</td>
-                        <td className="px-3 py-3 text-slate-700">{monthLabel(cap.triggerMonth)}</td>
-                        <td className="px-3 py-3"><span className={`inline-flex rounded-full border px-2 py-1 text-xs font-medium ${cap.status === "recovered" ? statusClasses.green : cap.status === "recovery_ready" ? statusClasses.yellow : statusClasses.red}`}>{cap.status.replace("_", " ")}</span></td>
-                        <td className="px-3 py-3 text-slate-700">{cap.ownerUser?.name || cap.ownerName || "—"}</td>
-                        <td className="px-3 py-3 text-slate-700">{dateLabel(cap.plannedRecoveryDate)}</td>
-                        <td className="px-4 py-3 text-slate-700">{dateLabel(cap.dateRecoveryMet)}</td>
-                      </tr>
-                    ))}
+                    {rows.map((cap) => {
+                      const expanded = expandedCapId === cap.id;
+                      return (
+                        <Fragment key={cap.id}>
+                          <tr>
+                            <td className="px-4 py-3 font-medium text-slate-900">{cap.division?.code}</td>
+                            <td className="px-3 py-3 text-slate-700">{cap.kpiLabel}</td>
+                            <td className="px-3 py-3 text-slate-700">{monthLabel(cap.triggerMonth)}</td>
+                            <td className="px-3 py-3"><span className={`inline-flex rounded-full border px-2 py-1 text-xs font-medium ${cap.status === "recovered" ? statusClasses.green : cap.status === "recovery_ready" ? statusClasses.yellow : statusClasses.red}`}>{cap.status.replace("_", " ")}</span></td>
+                            <td className="px-3 py-3 text-slate-700">{cap.ownerUser?.name || cap.ownerName || "—"}</td>
+                            <td className="px-3 py-3 text-slate-700">{dateLabel(cap.plannedRecoveryDate)}</td>
+                            <td className="px-4 py-3 text-slate-700">{dateLabel(cap.dateRecoveryMet)}</td>
+                            <td className="px-4 py-3 text-right">
+                              <button
+                                type="button"
+                                aria-expanded={expanded}
+                                aria-controls={`cap-details-${cap.id}`}
+                                onClick={() => setExpandedCapId(expanded ? null : cap.id)}
+                                className="whitespace-nowrap rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-brand-300 hover:text-brand-700"
+                              >
+                                {expanded ? "Hide details" : "View details"}
+                              </button>
+                            </td>
+                          </tr>
+                          {expanded && <tr><td colSpan="8" className="p-0"><CapDetails cap={cap} /></td></tr>}
+                        </Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
