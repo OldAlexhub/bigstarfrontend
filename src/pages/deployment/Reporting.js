@@ -3,6 +3,7 @@ import { useOutletContext } from "react-router-dom";
 import { apiGet, API_BASE } from "../../api/client";
 import MetricCard from "../../components/MetricCard";
 import { DISPOSITION_OPTIONS } from "../../config/dispositions";
+import { OSR_DISRUPTION_TYPE } from "../../config/disruptionTypes";
 import { toISODate, todayInTimezone, addDays } from "../../utils/dates";
 import { useLatestRequest } from "../../hooks/useLatestRequest";
 
@@ -71,6 +72,31 @@ const Reporting = () => {
       return String(a.route?.code).localeCompare(String(b.route?.code), undefined, { numeric: true });
     });
 
+  const osrRows = issues
+    .filter((issue) => issue.disruptionType === OSR_DISRUPTION_TYPE)
+    .map((issue) => {
+      const matchingDay = runCutDays.find(
+        (day) =>
+          day.route?._id === issue.route?._id &&
+          toISODate(day.date) === toISODate(issue.date)
+      );
+      return {
+        ...matchingDay,
+        reportId: issue._id,
+        date: issue.date,
+        route: issue.route || matchingDay?.route,
+        operator: issue.operator || matchingDay?.operator,
+        osrNotes: issue.notes || matchingDay?.disruptionNotes || matchingDay?.clientNotes || "",
+      };
+    })
+    .sort((a, b) => {
+      const dateComparison = toISODate(a.date).localeCompare(toISODate(b.date));
+      if (dateComparison) return dateComparison;
+      return String(a.route?.code).localeCompare(String(b.route?.code), undefined, { numeric: true });
+    });
+  const osrRouteCount = new Set(osrRows.map((day) => day.route?._id).filter(Boolean)).size;
+  const osrServiceDayCount = new Set(osrRows.map((day) => toISODate(day.date))).size;
+
   const dispositionCounts = Object.fromEntries(
     DISPOSITION_OPTIONS.map((option) => [
       option.value,
@@ -129,13 +155,14 @@ const Reporting = () => {
 
   // A plain <a href> download doesn't get proxied by the dev server for
   // top-level navigations, so fetch the file and save it via a Blob.
-  const handleDownload = async (format) => {
+  const handleDownload = async (format, osrOnly = false) => {
     if (!selectedDivision) return;
-    setDownloading(format);
+    const downloadKey = `${osrOnly ? "osr" : "issues"}-${format}`;
+    setDownloading(downloadKey);
     setError("");
     try {
       const res = await fetch(
-        `${API_BASE}/api/daily-issues/export?division=${selectedDivision._id}&from=${from}&to=${to}&format=${format}`,
+        `${API_BASE}/api/daily-issues/export?division=${selectedDivision._id}&from=${from}&to=${to}&format=${format}${osrOnly ? "&osr=1" : ""}`,
         { credentials: "include" }
       );
       if (!res.ok) {
@@ -145,7 +172,7 @@ const Reporting = () => {
       const blob = await res.blob();
       const disposition = res.headers.get("Content-Disposition") || "";
       const match = disposition.match(/filename="([^"]+)"/);
-      const filename = match ? match[1] : `issues-${from}-to-${to}.${format}`;
+      const filename = match ? match[1] : `${osrOnly ? "osrs" : "issues"}-${from}-to-${to}.${format}`;
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -187,6 +214,83 @@ const Reporting = () => {
       </div>
 
       {error && <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+
+      <section className="mb-8">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900">Out of Service Requests (OSRs)</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Daily-schedule OSRs with service dates in the selected reporting range.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => handleDownload("csv", true)}
+              disabled={!!downloading || osrRows.length === 0}
+              className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+            >
+              {downloading === "osr-csv" ? "Downloading…" : "Download OSR CSV"}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleDownload("xlsx", true)}
+              disabled={!!downloading || osrRows.length === 0}
+              className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              {downloading === "osr-xlsx" ? "Downloading…" : "Download OSR Excel"}
+            </button>
+          </div>
+        </div>
+
+        <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <MetricCard label="OSRs Processed" value={osrRows.length} tone="bad" />
+          <MetricCard label="Routes with OSRs" value={osrRouteCount} tone="warning" />
+          <MetricCard label="OSR Service Days" value={osrServiceDayCount} tone="info" />
+        </div>
+
+        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+          <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <thead className="bg-slate-50">
+              <tr>
+                {["Service Date", "Route", "Operator", "Vehicle", "Start", "End", "Status", "OSR Notes"].map(
+                  (heading) => (
+                    <th key={heading} className="px-3 py-2 text-left font-medium text-slate-500">
+                      {heading}
+                    </th>
+                  )
+                )}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {loading && (
+                <tr>
+                  <td colSpan={8} className="px-3 py-6 text-center text-slate-400">Loading…</td>
+                </tr>
+              )}
+              {!loading && osrRows.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="px-3 py-6 text-center text-slate-400">
+                    No OSRs have a service date in this range.
+                  </td>
+                </tr>
+              )}
+              {!loading && osrRows.map((day) => (
+                <tr key={day.reportId}>
+                  <td className="whitespace-nowrap px-3 py-2 text-slate-600">{toISODate(day.date)}</td>
+                  <td className="px-3 py-2 font-medium text-slate-900">{day.route?.code || "—"}</td>
+                  <td className="px-3 py-2 text-slate-600">{day.operator?.name || "—"}</td>
+                  <td className="px-3 py-2 text-slate-600">{day.vehicle?.code || "—"}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-slate-600">{day.startTime || "—"}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-slate-600">{day.endTime || "—"}</td>
+                  <td className="px-3 py-2 capitalize text-slate-600">{day.status}</td>
+                  <td className="px-3 py-2 text-slate-600">{day.osrNotes || "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <section className="mb-8">
         <h2 className="mb-3 text-sm font-semibold text-slate-900">Disposition Summary</h2>
@@ -274,7 +378,7 @@ const Reporting = () => {
             disabled={!!downloading || issues.length === 0}
             className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50"
           >
-            {downloading === "csv" ? "Downloading…" : "Download Issues CSV"}
+            {downloading === "issues-csv" ? "Downloading…" : "Download Issues CSV"}
           </button>
           <button
             type="button"
@@ -282,7 +386,7 @@ const Reporting = () => {
             disabled={!!downloading || issues.length === 0}
             className="rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
           >
-            {downloading === "xlsx" ? "Downloading…" : "Download Issues Excel"}
+            {downloading === "issues-xlsx" ? "Downloading…" : "Download Issues Excel"}
           </button>
         </div>
       </div>

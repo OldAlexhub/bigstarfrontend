@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import RunCutDayTable from "./RunCutDayTable";
 
 const row = {
@@ -44,4 +44,30 @@ test("a manual disposition remains editable when the status does not own it", ()
   );
 
   expect(screen.getByTitle("Final outcome for this route")).toBeEnabled();
+});
+
+test("daily assignment mode edits assignment fields without exposing master route controls", () => {
+  const onPatch = vi.fn();
+  render(
+    <RunCutDayTable
+      rows={[{
+        ...row,
+        operator: { name: "Original Operator" },
+        vehicle: { code: "BUS-1" },
+        pulloutAddress: "100 Main St",
+        startTime: "08:00",
+        endTime: "16:00",
+      }]}
+      onPatch={onPatch}
+      editableDailyAssignment
+      showDisruptionAndNotes={false}
+    />
+  );
+
+  fireEvent.blur(screen.getByDisplayValue("Original Operator"), { target: { value: "New Operator" } });
+  expect(onPatch).toHaveBeenCalledWith(expect.objectContaining({ _id: row._id }), {
+    operatorName: "New Operator",
+  });
+  expect(screen.queryByLabelText(/Route type/)).not.toBeInTheDocument();
+  expect(screen.queryByTitle("MON")).not.toBeInTheDocument();
 });

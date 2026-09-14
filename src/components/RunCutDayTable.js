@@ -65,6 +65,7 @@ const RunCutDayTable = ({
   showDisruptionAndNotes = true,
   showDisposition = false,
   editableAssignment = false,
+  editableDailyAssignment = false,
   operators = [],
   vehicles = [],
   onRemoveExtra,
@@ -74,6 +75,7 @@ const RunCutDayTable = ({
   editableStatus = true,
   editableDisposition = true,
 }) => {
+  const assignmentInputs = editableAssignment || editableDailyAssignment;
   const headers = [
     ...(showDivisionColumn ? ["Division"] : []),
     "Route",
@@ -95,7 +97,7 @@ const RunCutDayTable = ({
 
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-      {editableAssignment && (
+      {assignmentInputs && (
         <>
           <datalist id="rct-operators">
             {operators.map((o) => (
@@ -167,7 +169,7 @@ const RunCutDayTable = ({
                 </td>
               )}
               <td className="px-2 py-2">
-                {editableAssignment ? (
+                {assignmentInputs ? (
                   <input
                     list="rct-operators"
                     defaultValue={rc.operator?.name || ""}
@@ -187,7 +189,7 @@ const RunCutDayTable = ({
                 )}
               </td>
               <td className="px-2 py-2">
-                {editableAssignment ? (
+                {assignmentInputs ? (
                   <input
                     list="rct-vehicles"
                     defaultValue={rc.vehicle?.code || ""}
@@ -205,7 +207,7 @@ const RunCutDayTable = ({
                 )}
               </td>
               <td className="px-2 py-2">
-                {editableAssignment ? (
+                {assignmentInputs ? (
                   <input
                     defaultValue={rc.pulloutAddress || ""}
                     key={rc._id}
@@ -224,7 +226,7 @@ const RunCutDayTable = ({
                 )}
               </td>
               <td className="px-2 py-2">
-                {editableAssignment ? (
+                {assignmentInputs ? (
                   <input
                     type="time"
                     value={rc.startTime || ""}
@@ -236,7 +238,7 @@ const RunCutDayTable = ({
                 )}
               </td>
               <td className="px-2 py-2">
-                {editableAssignment ? (
+                {assignmentInputs ? (
                   <input
                     type="time"
                     value={rc.endTime || ""}

@@ -4,6 +4,7 @@ import { apiGet, apiPost, apiPatch, apiDelete } from "../../api/client";
 import { toISODate, todayInTimezone, addDays } from "../../utils/dates";
 import RunCutDayTable from "../../components/RunCutDayTable";
 import { useLatestRequest } from "../../hooks/useLatestRequest";
+import { OSR_DISRUPTION_TYPE } from "../../config/disruptionTypes";
 
 const StandbyPanel = ({ selectedDivision, targetDate, which, coverableRoutes, onCoverageChanged }) => {
   const [standbyDays, setStandbyDays] = useState([]);
@@ -11,16 +12,22 @@ const StandbyPanel = ({ selectedDivision, targetDate, which, coverableRoutes, on
   const [error, setError] = useState("");
   const { begin, isCurrent } = useLatestRequest();
   const dateStr = toISODate(targetDate);
+  const isDivision3 = ["DIV_3", "DIV_3_GL", "DIV_3_SB"].includes(selectedDivision?.code);
 
   useEffect(() => {
     if (!selectedDivision) return;
     const requestId = begin();
     setLoading(true);
-    apiGet(`/api/run-cut-days?division=${selectedDivision._id}&from=${dateStr}&to=${dateStr}&includeStandby=1`)
+    setError("");
+    apiGet(
+      `/api/run-cut-days?division=${selectedDivision._id}&from=${dateStr}&to=${dateStr}&includeStandby=1&sharedStandby=1`
+    )
       .then((data) => {
         if (isCurrent(requestId)) setStandbyDays(data.runCutDays.filter((rcd) => rcd.route?.type === "standby"));
       })
-      .catch(() => {})
+      .catch((err) => {
+        if (isCurrent(requestId)) setError(err.message);
+      })
       .finally(() => {
         if (isCurrent(requestId)) setLoading(false);
       });
@@ -44,13 +51,18 @@ const StandbyPanel = ({ selectedDivision, targetDate, which, coverableRoutes, on
     }
   };
 
-  if (loading || standbyDays.length === 0) return null;
-
   return (
     <div className="mt-6 rounded-xl border border-slate-200 bg-white">
-      <h3 className="border-b border-slate-100 px-4 py-2 text-sm font-semibold text-slate-900">
-        Standby — {which === "today" ? "Today" : "Tomorrow"}
-      </h3>
+      <div className="border-b border-slate-100 px-4 py-2">
+        <h3 className="text-sm font-semibold text-slate-900">
+          {isDivision3 ? "Division 3 Shared Standbys" : "Standbys"} — {which === "today" ? "Today" : "Tomorrow"}
+        </h3>
+        {isDivision3 && (
+          <p className="mt-1 text-xs text-slate-500">
+            The same standby duties can be deployed on ADA or GoLink revenue routes.
+          </p>
+        )}
+      </div>
       {error && <p className="px-4 pt-2 text-sm text-red-600">{error}</p>}
       <table className="min-w-full divide-y divide-slate-100 text-sm">
         <thead>
@@ -63,7 +75,21 @@ const StandbyPanel = ({ selectedDivision, targetDate, which, coverableRoutes, on
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
-          {standbyDays.map((rcd) => (
+          {loading && (
+            <tr>
+              <td colSpan={5} className="px-4 py-4 text-center text-slate-500">
+                Loading standby duties…
+              </td>
+            </tr>
+          )}
+          {!loading && standbyDays.length === 0 && (
+            <tr>
+              <td colSpan={5} className="px-4 py-4 text-center text-slate-500">
+                No standby duties are scheduled for this day.
+              </td>
+            </tr>
+          )}
+          {!loading && standbyDays.map((rcd) => (
             <tr key={rcd._id}>
               <td className="px-4 py-2 font-medium text-slate-900">{rcd.route?.code}</td>
               <td className="px-4 py-2 text-slate-600">{rcd.operator?.name || "—"}</td>
@@ -73,9 +99,27 @@ const StandbyPanel = ({ selectedDivision, targetDate, which, coverableRoutes, on
                 <select
                   value={rcd.coveringRoute?._id || ""}
                   onChange={(e) => setCoveringRoute(rcd, e.target.value)}
-                  className="rounded-md border border-slate-300 px-2 py-1 text-sm"
+                  disabled={
+                    rcd.deployed &&
+                    rcd.coveringRoute?.division &&
+                    String(rcd.coveringRoute.division) !== String(selectedDivision._id)
+                  }
+                  title={
+                    rcd.deployed &&
+                    rcd.coveringRoute?.division &&
+                    String(rcd.coveringRoute.division) !== String(selectedDivision._id)
+                      ? "This standby is deployed in another branch. Switch to that branch to change it."
+                      : "Select the route this standby is covering"
+                  }
+                  className="rounded-md border border-slate-300 px-2 py-1 text-sm disabled:bg-slate-100"
                 >
                   <option value="">— Not deployed —</option>
+                  {rcd.coveringRoute &&
+                    !coverableRoutes.some((routeDay) => routeDay.route?._id === rcd.coveringRoute?._id) && (
+                      <option value={rcd.coveringRoute._id}>
+                        {rcd.coveringRoute.code} (another branch)
+                      </option>
+                    )}
                   {coverableRoutes
                     .filter((r) => r.route)
                     .map((r) => (
@@ -93,8 +137,161 @@ const StandbyPanel = ({ selectedDivision, targetDate, which, coverableRoutes, on
   );
 };
 
+const OsrPlanner = ({ selectedDivision, advanceDays, onProcessed }) => {
+  const today = todayInTimezone(selectedDivision?.timezone);
+  const minDate = toISODate(today);
+  const maxDate = toISODate(addDays(today, advanceDays));
+  const defaultDate = toISODate(addDays(today, Math.min(1, advanceDays)));
+  const [expanded, setExpanded] = useState(false);
+  const [serviceDate, setServiceDate] = useState(defaultDate);
+  const [routeDays, setRouteDays] = useState([]);
+  const [runCutDayId, setRunCutDayId] = useState("");
+  const [notes, setNotes] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const request = useLatestRequest();
+
+  useEffect(() => {
+    setServiceDate(defaultDate);
+    setRunCutDayId("");
+    setNotes("");
+    setMessage("");
+  }, [defaultDate, selectedDivision?._id]);
+
+  useEffect(() => {
+    if (!expanded || !selectedDivision || !serviceDate) return;
+    const requestId = request.begin();
+    setLoading(true);
+    setError("");
+    apiGet(`/api/run-cut-days?division=${selectedDivision._id}&from=${serviceDate}&to=${serviceDate}`)
+      .then((data) => {
+        if (!request.isCurrent(requestId)) return;
+        const available = data.runCutDays.filter((day) => day.route?.type !== "standby");
+        setRouteDays(available);
+        setRunCutDayId((current) =>
+          available.some((day) => day._id === current) ? current : available[0]?._id || ""
+        );
+      })
+      .catch((err) => {
+        if (request.isCurrent(requestId)) setError(err.message);
+      })
+      .finally(() => {
+        if (request.isCurrent(requestId)) setLoading(false);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expanded, selectedDivision, serviceDate]);
+
+  const selectedRouteDay = routeDays.find((day) => day._id === runCutDayId);
+
+  const processOsr = async (event) => {
+    event.preventDefault();
+    if (!selectedRouteDay) return;
+    setSaving(true);
+    setError("");
+    setMessage("");
+    try {
+      const data = await apiPatch(`/api/run-cut-days/${selectedRouteDay._id}`, {
+        disruptionType: OSR_DISRUPTION_TYPE,
+        disruptionNotes: notes,
+      });
+      setRouteDays((current) =>
+        current.map((day) => (day._id === data.runCutDay._id ? data.runCutDay : day))
+      );
+      setMessage(
+        `OSR processed for ${data.runCutDay.route?.code || selectedRouteDay.route?.code} on ${serviceDate}.`
+      );
+      onProcessed?.(serviceDate);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50/40">
+      <button
+        type="button"
+        onClick={() => setExpanded((value) => !value)}
+        className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold text-slate-900"
+      >
+        <span>Out of Service Request (OSR) Planner</span>
+        <span className="text-xs font-normal text-slate-500">
+          {expanded ? "Close" : `Up to ${advanceDays} day${advanceDays === 1 ? "" : "s"} ahead`}
+        </span>
+      </button>
+      {expanded && (
+        <form onSubmit={processOsr} className="border-t border-blue-100 p-4">
+          <p className="mb-3 text-xs text-slate-500">
+            Processing an OSR suspends only the selected daily schedule. It does not change Master Run Cuts.
+          </p>
+          {error && <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+          {message && (
+            <p className="mb-3 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{message}</p>
+          )}
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="text-sm text-slate-600">
+              Service date
+              <input
+                type="date"
+                min={minDate}
+                max={maxDate}
+                value={serviceDate}
+                onChange={(event) => {
+                  setServiceDate(event.target.value);
+                  setMessage("");
+                }}
+                className="mt-1 block rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              />
+            </label>
+            <label className="text-sm text-slate-600">
+              Scheduled route
+              <select
+                value={runCutDayId}
+                onChange={(event) => {
+                  setRunCutDayId(event.target.value);
+                  setMessage("");
+                }}
+                disabled={loading || routeDays.length === 0}
+                required
+                className="mt-1 block min-w-48 rounded-md border border-slate-300 px-2 py-1.5 text-sm disabled:bg-slate-100"
+              >
+                {routeDays.length === 0 && <option value="">No routes scheduled</option>}
+                {routeDays.map((day) => (
+                  <option key={day._id} value={day._id}>
+                    {day.route?.code}
+                    {day.disruptionType === OSR_DISRUPTION_TYPE ? " (OSR processed)" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-sm text-slate-600">
+              OSR notes
+              <input
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder="Request details"
+                className="mt-1 block w-64 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={saving || loading || !runCutDayId}
+              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+            >
+              {saving ? "Processing…" : selectedRouteDay?.disruptionType === OSR_DISRUPTION_TYPE ? "Update OSR" : "Process OSR"}
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+};
+
 const emptyExtra = {
-  routeCode: "",
+  routeId: "",
   operatorName: "",
   vehicleCode: "",
   pulloutAddress: "",
@@ -117,6 +314,7 @@ const LiveSchedule = () => {
   const [operators, setOperators] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [runCuts, setRunCuts] = useState([]);
+  const [osrAdvanceDays, setOsrAdvanceDays] = useState(7);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [savingId, setSavingId] = useState(null);
@@ -158,6 +356,9 @@ const LiveSchedule = () => {
     apiGet("/api/operators")
       .then((data) => setOperators(data.operators))
       .catch(() => {});
+    apiGet("/api/settings")
+      .then((data) => setOsrAdvanceDays(data.settings?.osrAdvanceDays ?? 7))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -186,11 +387,8 @@ const LiveSchedule = () => {
   // adding an extra route, instead of making dispatch look everything up
   // and re-enter it. Whichever of these fields are different for the extra
   // shift (a different vehicle, a different time) can still be edited.
-  const assignmentForRouteCode = (code) => {
-    const route = routes.find((r) => r.code.toLowerCase() === code.trim().toLowerCase());
-    if (!route) return null;
-    return runCuts.find((rc) => rc.route?._id === route._id) || null;
-  };
+  const assignmentForRouteId = (routeId) =>
+    runCuts.find((runCut) => runCut.route?._id === routeId) || null;
 
   useEffect(() => {
     if (!selectedDivision) return;
@@ -208,6 +406,8 @@ const LiveSchedule = () => {
   );
   const todayRows = splitRowsByDisposition(sortedRows);
   const visibleRows = which === "today" ? todayRows[todayView] : sortedRows;
+  const scheduledRouteIds = new Set(rows.map((row) => row.route?._id).filter(Boolean));
+  const availableExtraRoutes = routes.filter((route) => !scheduledRouteIds.has(route._id));
 
   const handlePatch = async (runCutDay, patch) => {
     setSavingId(runCutDay._id);
@@ -223,14 +423,14 @@ const LiveSchedule = () => {
 
   const handleAddExtra = async (e) => {
     e.preventDefault();
-    if (!newExtra.routeCode.trim() || !selectedDivision) return;
+    if (!newExtra.routeId || !selectedDivision) return;
     setAddingExtra(true);
     setAddExtraError("");
     try {
       await apiPost("/api/run-cut-days", {
         division: selectedDivision._id,
         date: dateStr,
-        routeCode: newExtra.routeCode.trim(),
+        routeId: newExtra.routeId,
         operatorName: newExtra.operatorName,
         vehicleCode: newExtra.vehicleCode,
         pulloutAddress: newExtra.pulloutAddress,
@@ -259,11 +459,6 @@ const LiveSchedule = () => {
 
   return (
     <div>
-      <datalist id="dep-routes">
-        {routes.map((r) => (
-          <option key={r._id} value={r.code} />
-        ))}
-      </datalist>
       <datalist id="dep-operators">
         {operators.map((o) => (
           <option key={o._id} value={o.name} />
@@ -274,6 +469,14 @@ const LiveSchedule = () => {
           <option key={v._id} value={v.code} />
         ))}
       </datalist>
+
+      <OsrPlanner
+        selectedDivision={selectedDivision}
+        advanceDays={osrAdvanceDays}
+        onProcessed={(serviceDate) => {
+          if (serviceDate === dateStr) load();
+        }}
+      />
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         {[
@@ -296,7 +499,7 @@ const LiveSchedule = () => {
           onClick={() => setShowAddExtra((v) => !v)}
           className="ml-auto rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
         >
-          {showAddExtra ? "Cancel" : "+ Add Extra Route"}
+          {showAddExtra ? "Cancel" : "+ Add Revenue Route"}
         </button>
       </div>
 
@@ -307,27 +510,30 @@ const LiveSchedule = () => {
           )}
           <div className="flex flex-wrap items-end gap-3">
             <label className="text-sm text-slate-600">
-              Route
-              <input
-                list="dep-routes"
-                value={newExtra.routeCode}
-                onChange={(e) => setNewExtra({ ...newExtra, routeCode: e.target.value })}
-                onBlur={(e) => {
-                  const assignment = assignmentForRouteCode(e.target.value);
-                  if (!assignment) return;
-                  setNewExtra((f) => ({
-                    ...f,
-                    operatorName: f.operatorName || assignment.operator?.name || "",
-                    vehicleCode: f.vehicleCode || assignment.vehicle?.code || "",
-                    pulloutAddress: f.pulloutAddress || assignment.pulloutAddress || "",
-                    startTime: f.startTime || assignment.startTime || "",
-                    endTime: f.endTime || assignment.endTime || "",
-                  }));
+              Revenue route
+              <select
+                value={newExtra.routeId}
+                onChange={(event) => {
+                  const routeId = event.target.value;
+                  const assignment = assignmentForRouteId(routeId);
+                  setNewExtra({
+                    ...emptyExtra,
+                    routeId,
+                    operatorName: assignment?.operator?.name || "",
+                    vehicleCode: assignment?.vehicle?.code || "",
+                    pulloutAddress: assignment?.pulloutAddress || "",
+                    startTime: assignment?.startTime || "",
+                    endTime: assignment?.endTime || "",
+                  });
                 }}
-                placeholder="Route code"
                 required
-                className="mt-1 block w-28 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
-              />
+                className="mt-1 block min-w-40 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              >
+                <option value="">Select from division pool</option>
+                {availableExtraRoutes.map((route) => (
+                  <option key={route._id} value={route._id}>{route.code}</option>
+                ))}
+              </select>
             </label>
             <label className="text-sm text-slate-600">
               Operator
@@ -390,7 +596,7 @@ const LiveSchedule = () => {
               disabled={addingExtra}
               className="rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-60"
             >
-              {addingExtra ? "Adding…" : "Add extra route"}
+              {addingExtra ? "Adding…" : "Add revenue route"}
             </button>
           </div>
         </form>
@@ -431,6 +637,9 @@ const LiveSchedule = () => {
           onPatch={handlePatch}
           onRemoveExtra={handleRemoveExtra}
           showDisposition={which === "today"}
+          editableDailyAssignment
+          operators={operators}
+          vehicles={vehicles}
           emptyMessage={
             which === "today"
               ? `No ${todayView} routes scheduled for today.`
@@ -440,8 +649,8 @@ const LiveSchedule = () => {
       )}
 
       <p className="mt-3 text-xs text-slate-400">
-        Operator, vehicle, and schedule come from Master Run Cuts. Status, disruption, client notes, and disposition set here
-        apply to {which === "today" ? "today" : "tomorrow"} only and don't change the ongoing schedule.
+        Operator, vehicle, pullout address, times, status, disruption, client notes, and disposition set here apply to this
+        daily schedule only. Master Run Cuts remains unchanged.
       </p>
 
       {selectedDivision && (

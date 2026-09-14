@@ -139,6 +139,7 @@ const SettingsPage = () => {
       const data = await apiPut("/api/settings", {
         breakMinutes: Number(settings.breakMinutes),
         revenueRatio: Number(settings.revenueRatio),
+        osrAdvanceDays: Number(settings.osrAdvanceDays ?? 7),
         operationsReportingStartMonth: settings.operationsReportingStartMonth,
       });
       setSettings(data.settings);
@@ -195,7 +196,7 @@ const SettingsPage = () => {
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-slate-900">Settings</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Manage run-cut calculations, division timezones, and effective-dated Operations KPI targets.
+          Manage run-cut calculations, the OSR planning policy, division timezones, and effective-dated Operations KPI targets.
         </p>
         {isELT && (
           <p className="mt-2 text-sm">
@@ -232,6 +233,22 @@ const SettingsPage = () => {
               onChange={(e) => setSettings({ ...settings, revenueRatio: e.target.value })}
               className={`${inputClasses} mt-1 block`}
             />
+          </label>
+          <label className="text-sm text-slate-600">
+            OSR advance days
+            <input
+              type="number"
+              min="0"
+              max="7"
+              step="1"
+              disabled={!isELT}
+              value={settings.osrAdvanceDays ?? 7}
+              onChange={(e) => setSettings({ ...settings, osrAdvanceDays: e.target.value })}
+              className={`${inputClasses} mt-1 block`}
+            />
+            <span className="mt-1 block max-w-xs text-xs font-normal text-slate-400">
+              How far ahead Deployment can process an OSR (maximum 7 days).
+            </span>
           </label>
           <label className="text-sm text-slate-600">
             CAP activation month

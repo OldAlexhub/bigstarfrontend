@@ -1,6 +1,6 @@
-// OSR ("Out of Service Request") also suspends the route for tomorrow only
-// when picked — a day-specific override that auto-reverts the day after,
-// same as every other Deployment-side exception.
+// An OSR suspends its selected service date only. Deployment can plan it
+// ahead within the company-configured policy window without changing the
+// persistent Master Run Cut.
 export const OSR_DISRUPTION_TYPE = "OSR (Out of Service Request)";
 
 export const DISRUPTION_TYPES = [
