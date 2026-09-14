@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useSearchParams } from "react-router-dom";
 import { apiGet } from "../../api/client";
+import { REALLOCATION_UPDATED_EVENT } from "../reallocationUi";
+import { TEAM_POST_UPDATED_EVENT } from "../posts/postUi";
 
 const TABS = [
   { to: "/deployment", label: "Live Schedule", end: true },
@@ -9,6 +11,8 @@ const TABS = [
   { to: "/deployment/client-report", label: "Client Report", end: false },
   { to: "/deployment/reporting", label: "Reporting", end: false },
   { to: "/deployment/schedule-history", label: "Schedule History", end: false },
+  { to: "/deployment/receiving-requests", label: "Receiving Requests", end: false, requestNotifications: true },
+  { to: "/deployment/posts", label: "Posts", end: false, postNotifications: true },
   { to: "/deployment/tracker-log", label: "Tracker Log", end: false },
 ];
 
@@ -24,6 +28,10 @@ const DeploymentLayout = () => {
   const [selectedDivisionId, setSelectedDivisionId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [pendingRequestCount, setPendingRequestCount] = useState(0);
+  const [pendingByDivision, setPendingByDivision] = useState({});
+  const [postCount, setPostCount] = useState(0);
+  const [postByDivision, setPostByDivision] = useState({});
   const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
@@ -50,7 +58,55 @@ const DeploymentLayout = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    const loadPostCount = () => {
+      apiGet("/api/team-posts/notifications?section=deployment")
+        .then((data) => {
+          if (!cancelled) {
+            setPostCount(data.count || 0);
+            setPostByDivision(data.byDivision || {});
+          }
+        })
+        .catch(() => {});
+    };
+    loadPostCount();
+    const interval = window.setInterval(loadPostCount, 30_000);
+    window.addEventListener("focus", loadPostCount);
+    window.addEventListener(TEAM_POST_UPDATED_EVENT, loadPostCount);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", loadPostCount);
+      window.removeEventListener(TEAM_POST_UPDATED_EVENT, loadPostCount);
+    };
+  }, []);
+
   const selectedDivision = divisions.find((d) => d._id === selectedDivisionId) || null;
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadPendingCount = () => {
+      apiGet("/api/reallocation-requests/pending-notifications")
+        .then((data) => {
+          if (!cancelled) {
+            setPendingRequestCount(data.count || 0);
+            setPendingByDivision(data.byDivision || {});
+          }
+        })
+        .catch(() => {});
+    };
+    loadPendingCount();
+    const interval = window.setInterval(loadPendingCount, 30_000);
+    window.addEventListener("focus", loadPendingCount);
+    window.addEventListener(REALLOCATION_UPDATED_EVENT, loadPendingCount);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", loadPendingCount);
+      window.removeEventListener(REALLOCATION_UPDATED_EVENT, loadPendingCount);
+    };
+  }, []);
 
   const handleSelectDivision = (id) => {
     setSelectedDivisionId(id);
@@ -70,6 +126,12 @@ const DeploymentLayout = () => {
             {divisions.map((d) => (
               <option key={d._id} value={d._id}>
                 {d.name}
+                {pendingByDivision[d._id] || postByDivision[d._id]
+                  ? ` (${[
+                      pendingByDivision[d._id] ? `${pendingByDivision[d._id]} request${pendingByDivision[d._id] === 1 ? "" : "s"}` : "",
+                      postByDivision[d._id] ? `${postByDivision[d._id]} post${postByDivision[d._id] === 1 ? "" : "s"}` : "",
+                    ].filter(Boolean).join(", ")})`
+                  : ""}
               </option>
             ))}
           </select>
@@ -80,6 +142,16 @@ const DeploymentLayout = () => {
         {TABS.map((tab) => (
           <NavLink key={tab.to} to={tab.to} end={tab.end} className={tabClasses}>
             {tab.label}
+            {tab.requestNotifications && pendingRequestCount > 0 && (
+              <span className="ml-2 inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-white" aria-label={`${pendingRequestCount} pending requests`}>
+                {pendingRequestCount > 99 ? "99+" : pendingRequestCount}
+              </span>
+            )}
+            {tab.postNotifications && postCount > 0 && (
+              <span className="ml-2 inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-white" aria-label={`${postCount} unread posts or responses`}>
+                {postCount > 99 ? "99+" : postCount}
+              </span>
+            )}
           </NavLink>
         ))}
       </div>

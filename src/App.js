@@ -23,6 +23,7 @@ import ExcelSubmissions from "./pages/network-success/ExcelSubmissions";
 import NetworkPerformance from "./pages/network-success/NetworkPerformance";
 import EmailTemplates from "./pages/network-success/EmailTemplates";
 import LdHelper from "./pages/network-success/LdHelper";
+import ReallocationRequests from "./pages/network-success/ReallocationRequests";
 import CustomerServiceLayout from "./pages/customer-service/CustomerServiceLayout";
 import CustomerServiceEntries from "./pages/customer-service/CustomerServiceEntries";
 import CustomerServiceAnalytics from "./pages/customer-service/CustomerServiceAnalytics";
@@ -35,6 +36,9 @@ import KpiTracker from "./pages/operations-reporting/KpiTracker";
 import MonthlyDashboard from "./pages/operations-reporting/MonthlyDashboard";
 import CapQueue from "./pages/operations-reporting/CapQueue";
 import CapReporting from "./pages/operations-reporting/CapReporting";
+import ReceivingRequests from "./pages/deployment/ReceivingRequests";
+import DeploymentPosts from "./pages/deployment/Posts";
+import NetworkSuccessPosts from "./pages/network-success/Posts";
 
 function App() {
   return (
@@ -55,6 +59,8 @@ function App() {
             <Route path="client-report" element={<ClientReport />} />
             <Route path="reporting" element={<Reporting />} />
             <Route path="schedule-history" element={<ScheduleHistory />} />
+            <Route path="receiving-requests" element={<ReceivingRequests />} />
+            <Route path="posts" element={<DeploymentPosts />} />
             <Route path="tracker-log" element={<ActivityLog />} />
           </Route>
           <Route path="/elt-reporting" element={<EltReporting />} />
@@ -62,6 +68,8 @@ function App() {
           <Route path="/network-success" element={<NetworkSuccessLayout />}>
             <Route index element={<ExcelSubmissions />} />
             <Route path="performance" element={<NetworkPerformance />} />
+            <Route path="reallocation-requests" element={<ReallocationRequests />} />
+            <Route path="posts" element={<NetworkSuccessPosts />} />
             <Route path="email-templates" element={<EmailTemplates />} />
             <Route path="ld-helper" element={<LdHelper />} />
           </Route>

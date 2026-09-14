@@ -1,7 +1,57 @@
+import { useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
+import { apiGet } from "../../api/client";
+import { REALLOCATION_UPDATED_EVENT } from "../reallocationUi";
+import { TEAM_POST_UPDATED_EVENT } from "../posts/postUi";
 
-const NetworkSuccessLayout = () => (
-  <div>
+const NetworkSuccessLayout = () => {
+  const [acceptedCount, setAcceptedCount] = useState(0);
+  const [postCount, setPostCount] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadNotifications = () => {
+      apiGet("/api/reallocation-requests/notifications")
+        .then((data) => {
+          if (!cancelled) setAcceptedCount(data.count || 0);
+        })
+        .catch(() => {});
+    };
+    loadNotifications();
+    const interval = window.setInterval(loadNotifications, 30_000);
+    window.addEventListener("focus", loadNotifications);
+    window.addEventListener(REALLOCATION_UPDATED_EVENT, loadNotifications);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", loadNotifications);
+      window.removeEventListener(REALLOCATION_UPDATED_EVENT, loadNotifications);
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadNotifications = () => {
+      apiGet("/api/team-posts/notifications?section=network_success")
+        .then((data) => {
+          if (!cancelled) setPostCount(data.count || 0);
+        })
+        .catch(() => {});
+    };
+    loadNotifications();
+    const interval = window.setInterval(loadNotifications, 30_000);
+    window.addEventListener("focus", loadNotifications);
+    window.addEventListener(TEAM_POST_UPDATED_EVENT, loadNotifications);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", loadNotifications);
+      window.removeEventListener(TEAM_POST_UPDATED_EVENT, loadNotifications);
+    };
+  }, []);
+
+  return (
+    <div>
     <div className="mb-6">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-600">Operations intelligence</p>
       <h1 className="mt-1 text-2xl font-semibold text-slate-900">Network Success</h1>
@@ -32,6 +82,36 @@ const NetworkSuccessLayout = () => (
         Performance
       </NavLink>
       <NavLink
+        to="/network-success/reallocation-requests"
+        className={({ isActive }) =>
+          `inline-flex shrink-0 border-b-2 px-1 py-3 text-sm font-medium ${
+            isActive ? "border-brand-500 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-700"
+          }`
+        }
+      >
+        Reallocation Requests
+        {acceptedCount > 0 && (
+          <span className="ml-2 inline-flex min-w-5 items-center justify-center rounded-full bg-emerald-600 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-white" aria-label={`${acceptedCount} accepted requests`}>
+            {acceptedCount > 99 ? "99+" : acceptedCount}
+          </span>
+        )}
+      </NavLink>
+      <NavLink
+        to="/network-success/posts"
+        className={({ isActive }) =>
+          `inline-flex shrink-0 border-b-2 px-1 py-3 text-sm font-medium ${
+            isActive ? "border-brand-500 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-700"
+          }`
+        }
+      >
+        Posts
+        {postCount > 0 && (
+          <span className="ml-2 inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-white" aria-label={`${postCount} unread posts or responses`}>
+            {postCount > 99 ? "99+" : postCount}
+          </span>
+        )}
+      </NavLink>
+      <NavLink
         to="/network-success/email-templates"
         className={({ isActive }) =>
           `inline-flex shrink-0 border-b-2 px-1 py-3 text-sm font-medium ${
@@ -53,7 +133,8 @@ const NetworkSuccessLayout = () => (
       </NavLink>
     </div>
     <Outlet />
-  </div>
-);
+    </div>
+  );
+};
 
 export default NetworkSuccessLayout;
