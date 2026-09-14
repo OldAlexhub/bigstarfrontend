@@ -3,16 +3,67 @@
 // changes are tested together instead of silently hitting an older deploy.
 export const API_BASE = import.meta.env.DEV ? "" : import.meta.env.REACT_APP_API_URL || "";
 
+export const AUTH_UNAUTHORIZED_EVENT = "bigstar:unauthorized";
+export const AUTH_TOKEN_STORAGE_KEY = "bigstar.authToken";
+
+let memoryAuthToken = null;
+
+const sessionStorageOrNull = () => {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+};
+
+export const getAuthToken = () => {
+  try {
+    return sessionStorageOrNull()?.getItem(AUTH_TOKEN_STORAGE_KEY) || memoryAuthToken;
+  } catch {
+    return memoryAuthToken;
+  }
+};
+
+export const setAuthToken = (token) => {
+  memoryAuthToken = token || null;
+  try {
+    const storage = sessionStorageOrNull();
+    if (token) storage?.setItem(AUTH_TOKEN_STORAGE_KEY, token);
+    else storage?.removeItem(AUTH_TOKEN_STORAGE_KEY);
+  } catch {
+    // The in-memory copy still supports browsers where storage is unavailable.
+  }
+};
+
+export const clearAuthToken = () => setAuthToken(null);
+
+const reportUnauthorized = () => {
+  clearAuthToken();
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT));
+  }
+};
+
 const request = async (path, options = {}) => {
   const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
+  const headers = new Headers(options.headers);
+  if (!isFormData && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+
+  const token = getAuthToken();
+  if (token && !headers.has("Authorization")) headers.set("Authorization", `Bearer ${token}`);
+
   const res = await fetch(`${API_BASE}${path}`, {
-    credentials: "include",
-    headers: isFormData ? undefined : { "Content-Type": "application/json" },
     ...options,
+    credentials: "include",
+    headers,
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(data.message || `Request failed (${res.status})`);
+    if (res.status === 401) reportUnauthorized();
+    const error = new Error(data.message || `Request failed (${res.status})`);
+    error.status = res.status;
+    throw error;
   }
   return data;
 };
