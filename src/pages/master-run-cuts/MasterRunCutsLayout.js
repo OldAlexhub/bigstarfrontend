@@ -6,6 +6,8 @@ import { TIMEZONES, DEFAULT_TIMEZONE } from "../../utils/dates";
 
 const TABS = [
   { to: "/master-run-cuts", label: "Run Cuts", end: true },
+  { to: "/master-run-cuts/drivers", label: "Drivers", end: false },
+  { to: "/master-run-cuts/vehicles", label: "Vehicles", end: false },
   { to: "/master-run-cuts/tracker", label: "Tracker", end: false },
 ];
 

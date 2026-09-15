@@ -23,7 +23,7 @@ const analysis = {
 test("Performance supports accessible date and provider filters and renders automated analysis", async () => {
   apiGet.mockImplementation((path) => {
     if (path === "/api/divisions") return Promise.resolve({ divisions: [{ _id: "division-1", code: "D1", name: "Division One" }] });
-    if (path === "/api/operators") return Promise.resolve({ operators: [{ _id: "operator-1", name: "Master Operator", provider: { _id: "provider-1", name: "Provider A" }, active: true }] });
+    if (path === "/api/operators") return Promise.resolve({ operators: [{ _id: "operator-1", name: "Master Operator", division: "division-1", provider: { _id: "provider-1", name: "Provider A" }, active: true }] });
     return Promise.resolve(analysis);
   });
   apiPatch.mockResolvedValue({ message: "saved" });

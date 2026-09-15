@@ -128,6 +128,11 @@ const ReallocationRequests = () => {
 
   const selectedDivision = divisions.find((division) => division._id === divisionId);
   const selectedRunCut = runCuts.find((runCut) => runCut._id === form.runCut);
+  const divisionOperators = operators.filter(
+    (operator) =>
+      operator.active !== false &&
+      String(operator.division?._id || operator.division || "") === String(divisionId)
+  );
   const clearingCurrentAssignment = Boolean(
     form.runCut && !form.destinationRunCut && !form.operatorName.trim()
   );
@@ -170,6 +175,7 @@ const ReallocationRequests = () => {
   };
 
   const changeOperator = (operatorName) => {
+    const selectedOperator = divisionOperators.find((operator) => operator.name === operatorName);
     setForm((current) => {
       const wasClearing = !current.destinationRunCut && !current.operatorName.trim();
       const nowClearing = !current.destinationRunCut && !operatorName.trim();
@@ -181,11 +187,7 @@ const ReallocationRequests = () => {
           : wasClearing
             ? selectedRunCut?.vehicle?.code || ""
             : current.vehicleCode,
-        pulloutAddress: nowClearing
-          ? ""
-          : wasClearing
-            ? selectedRunCut?.pulloutAddress || ""
-            : current.pulloutAddress,
+        pulloutAddress: nowClearing ? "" : selectedOperator?.pulloutAddress || "",
       };
     });
   };
@@ -295,43 +297,38 @@ const ReallocationRequests = () => {
           </label>
           <label className="text-sm font-medium text-slate-700">
             New operator <span className="font-normal text-slate-400">(optional)</span>
-            <input
-              list="reallocation-operators"
+            <select
               value={form.operatorName}
               onChange={(event) => changeOperator(event.target.value)}
-              placeholder={form.destinationRunCut ? "Blank moves current operator" : "Leave blank to unassign"}
-              className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 font-normal"
-            />
+              className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 font-normal"
+            >
+              <option value="">{form.destinationRunCut ? "Move current operator" : "Leave unassigned"}</option>
+              {divisionOperators.map((operator) => <option key={operator._id} value={operator.name}>{operator.name}</option>)}
+            </select>
           </label>
           <label className="text-sm font-medium text-slate-700">
             Vehicle associated
-            <input
-              list="reallocation-vehicles"
+            <select
               value={form.vehicleCode}
               onChange={(event) => setForm({ ...form, vehicleCode: event.target.value })}
               disabled={clearingCurrentAssignment}
-              placeholder={clearingCurrentAssignment ? "Cleared when route is unassigned" : "Vehicle number"}
-              className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 font-normal disabled:bg-slate-100"
-            />
+              className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 font-normal disabled:bg-slate-100"
+            >
+              <option value="">Unassigned</option>
+              {vehicles.filter((vehicle) => vehicle.active !== false).map((vehicle) => <option key={vehicle._id} value={vehicle.code}>{vehicle.code}</option>)}
+            </select>
           </label>
           <label className="text-sm font-medium text-slate-700">
             Pullout address
             <input
               value={form.pulloutAddress}
-              onChange={(event) => setForm({ ...form, pulloutAddress: event.target.value })}
+              readOnly
               disabled={clearingCurrentAssignment}
-              placeholder={clearingCurrentAssignment ? "Cleared when route is unassigned" : "Pullout address"}
-              className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 font-normal disabled:bg-slate-100"
+              placeholder={clearingCurrentAssignment ? "Cleared when route is unassigned" : "Set by driver"}
+              className="mt-1 block w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 font-normal disabled:bg-slate-100"
             />
           </label>
         </div>
-        <datalist id="reallocation-operators">
-          {operators.filter((operator) => operator.active !== false).map((operator) => <option key={operator._id} value={operator.name} />)}
-        </datalist>
-        <datalist id="reallocation-vehicles">
-          {vehicles.filter((vehicle) => vehicle.active !== false).map((vehicle) => <option key={vehicle._id} value={vehicle.code} />)}
-        </datalist>
-
         {selectedRunCut && (
           <div className="mt-4 rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-600">
             <span className="font-medium text-slate-800">Current assignment:</span>{" "}

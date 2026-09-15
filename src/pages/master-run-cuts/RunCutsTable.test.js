@@ -24,7 +24,7 @@ const runCut = {
 beforeEach(() => {
   apiGet.mockImplementation((path) => {
     if (path.startsWith("/api/run-cuts")) return Promise.resolve({ runCuts: [runCut] });
-    if (path === "/api/operators") return Promise.resolve({ operators: [] });
+    if (path.startsWith("/api/operators")) return Promise.resolve({ operators: [] });
     return Promise.resolve({ vehicles: [] });
   });
   apiPost.mockImplementation((path) => path === "/api/routes"

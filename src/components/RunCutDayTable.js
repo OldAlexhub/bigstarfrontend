@@ -27,8 +27,8 @@ const toggleDay = (days, day) =>
 // way, so this component doesn't care which it's rendering.
 //
 // Master Run Cuts owns the ongoing plan: Operator/Vehicle/Pullout/Start/End
-// and Days render as inputs there (editableAssignment) — free-text with an
-// autocomplete list, typing a new name/code creates it — and a Status
+// and Days render as inputs there (editableAssignment) using the division's
+// managed Drivers and Vehicles rosters — and a Status
 // change there is persistent, projecting forward onto every future
 // scheduled day. Deployment owns the live day's exceptions: Status,
 // Disruption, and Client Notes (showDisruptionAndNotes) are edited there
@@ -95,22 +95,16 @@ const RunCutDayTable = ({
   ];
   const tableWidth = headers.reduce((sum, h) => sum + COLUMN_WIDTHS[h], 0);
 
+  const rosterForRow = (items, row, currentId) => {
+    const divisionId = String(row.division?._id || row.division || "");
+    return items.filter((item) => {
+      const sameDivision = !divisionId || String(item.division?._id || item.division || "") === divisionId;
+      return sameDivision && (item.active !== false || String(item._id) === String(currentId || ""));
+    });
+  };
+
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-      {assignmentInputs && (
-        <>
-          <datalist id="rct-operators">
-            {operators.map((o) => (
-              <option key={o._id} value={o.name} />
-            ))}
-          </datalist>
-          <datalist id="rct-vehicles">
-            {vehicles.map((v) => (
-              <option key={v._id} value={v.code} />
-            ))}
-          </datalist>
-        </>
-      )}
       <table
         className="table-fixed divide-y divide-slate-200 text-sm"
         style={{ width: "100%", minWidth: tableWidth }}
@@ -170,18 +164,20 @@ const RunCutDayTable = ({
               )}
               <td className="px-2 py-2">
                 {assignmentInputs ? (
-                  <input
-                    list="rct-operators"
-                    defaultValue={rc.operator?.name || ""}
-                    key={rc._id}
-                    onBlur={(e) => {
-                      if (e.target.value !== (rc.operator?.name || "")) {
-                        onPatch(rc, { operatorName: e.target.value });
-                      }
-                    }}
-                    placeholder="—"
-                    className="w-full rounded-md border border-slate-200 px-1.5 py-1 text-xs focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                  />
+                  <select
+                    aria-label={`Driver for ${rc.route?.code}`}
+                    value={rc.operator?._id || ""}
+                    disabled={savingId === rc._id}
+                    onChange={(e) => onPatch(rc, { operatorId: e.target.value })}
+                    className="w-full rounded-md border border-slate-200 bg-white px-1.5 py-1 text-xs focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                  >
+                    <option value="">Unassigned</option>
+                    {rosterForRow(operators, rc, rc.operator?._id).map((operator) => (
+                      <option key={operator._id} value={operator._id}>
+                        {operator.name}{operator.active === false ? " (inactive)" : ""}
+                      </option>
+                    ))}
+                  </select>
                 ) : (
                   <span className="block truncate text-slate-600" title={rc.operator?.name}>
                     {rc.operator?.name || "—"}
@@ -190,40 +186,28 @@ const RunCutDayTable = ({
               </td>
               <td className="px-2 py-2">
                 {assignmentInputs ? (
-                  <input
-                    list="rct-vehicles"
-                    defaultValue={rc.vehicle?.code || ""}
-                    key={rc._id}
-                    onBlur={(e) => {
-                      if (e.target.value !== (rc.vehicle?.code || "")) {
-                        onPatch(rc, { vehicleCode: e.target.value });
-                      }
-                    }}
-                    placeholder="—"
-                    className="w-full rounded-md border border-slate-200 px-1.5 py-1 text-xs focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                  />
+                  <select
+                    aria-label={`Vehicle for ${rc.route?.code}`}
+                    value={rc.vehicle?._id || ""}
+                    disabled={savingId === rc._id}
+                    onChange={(e) => onPatch(rc, { vehicleId: e.target.value })}
+                    className="w-full rounded-md border border-slate-200 bg-white px-1.5 py-1 text-xs focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                  >
+                    <option value="">Unassigned</option>
+                    {rosterForRow(vehicles, rc, rc.vehicle?._id).map((vehicle) => (
+                      <option key={vehicle._id} value={vehicle._id}>
+                        {vehicle.code}{vehicle.active === false ? " (inactive)" : ""}
+                      </option>
+                    ))}
+                  </select>
                 ) : (
                   <span className="block truncate text-slate-600">{rc.vehicle?.code || "—"}</span>
                 )}
               </td>
               <td className="px-2 py-2">
-                {assignmentInputs ? (
-                  <input
-                    defaultValue={rc.pulloutAddress || ""}
-                    key={rc._id}
-                    onBlur={(e) => {
-                      if (e.target.value !== (rc.pulloutAddress || "")) {
-                        onPatch(rc, { pulloutAddress: e.target.value });
-                      }
-                    }}
-                    placeholder="—"
-                    className="w-full rounded-md border border-slate-200 px-2 py-1 text-xs focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                  />
-                ) : (
-                  <span className="block truncate text-slate-600" title={rc.pulloutAddress}>
-                    {rc.pulloutAddress || "—"}
-                  </span>
-                )}
+                <span className="block truncate text-slate-600" title={rc.pulloutAddress}>
+                  {rc.pulloutAddress || "—"}
+                </span>
               </td>
               <td className="px-2 py-2">
                 {assignmentInputs ? (

@@ -7,6 +7,8 @@ import SettingsPage from "./pages/SettingsPage";
 import MasterRunCutsLayout from "./pages/master-run-cuts/MasterRunCutsLayout";
 import RunCutsTable from "./pages/master-run-cuts/RunCutsTable";
 import TrackerDashboard from "./pages/master-run-cuts/TrackerDashboard";
+import DriversRoster from "./pages/master-run-cuts/DriversRoster";
+import VehiclesRoster from "./pages/master-run-cuts/VehiclesRoster";
 import DeploymentLayout from "./pages/deployment/DeploymentLayout";
 import LiveSchedule from "./pages/deployment/LiveSchedule";
 import IssueLog from "./pages/deployment/IssueLog";
@@ -16,6 +18,8 @@ import ActivityLog from "./pages/deployment/ActivityLog";
 import ScheduleHistory from "./pages/deployment/ScheduleHistory";
 import StandbyUtilization from "./pages/deployment/StandbyUtilization";
 import EltReporting from "./pages/EltReporting";
+import EltReportingLayout from "./pages/elt-reporting/EltReportingLayout";
+import CompanyOutlook from "./pages/elt-reporting/CompanyOutlook";
 import Leaderboard from "./pages/Leaderboard";
 import UserAdmin from "./pages/UserAdmin";
 import NetworkSuccessLayout from "./pages/network-success/NetworkSuccessLayout";
@@ -50,6 +54,8 @@ function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/master-run-cuts" element={<MasterRunCutsLayout />}>
             <Route index element={<RunCutsTable />} />
+            <Route path="drivers" element={<DriversRoster />} />
+            <Route path="vehicles" element={<VehiclesRoster />} />
             <Route path="tracker" element={<TrackerDashboard />} />
           </Route>
           <Route path="/deployment" element={<DeploymentLayout />}>
@@ -63,7 +69,10 @@ function App() {
             <Route path="posts" element={<DeploymentPosts />} />
             <Route path="tracker-log" element={<ActivityLog />} />
           </Route>
-          <Route path="/elt-reporting" element={<EltReporting />} />
+          <Route path="/elt-reporting" element={<EltReportingLayout />}>
+            <Route index element={<EltReporting />} />
+            <Route path="outlook" element={<CompanyOutlook />} />
+          </Route>
           <Route path="/leaderboard" element={<Leaderboard />} />
           <Route path="/network-success" element={<NetworkSuccessLayout />}>
             <Route index element={<ExcelSubmissions />} />

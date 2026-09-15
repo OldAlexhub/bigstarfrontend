@@ -52,8 +52,8 @@ test("daily assignment mode edits assignment fields without exposing master rout
     <RunCutDayTable
       rows={[{
         ...row,
-        operator: { name: "Original Operator" },
-        vehicle: { code: "BUS-1" },
+        operator: { _id: "operator-1", name: "Original Operator" },
+        vehicle: { _id: "vehicle-1", code: "BUS-1" },
         pulloutAddress: "100 Main St",
         startTime: "08:00",
         endTime: "16:00",
@@ -61,13 +61,19 @@ test("daily assignment mode edits assignment fields without exposing master rout
       onPatch={onPatch}
       editableDailyAssignment
       showDisruptionAndNotes={false}
+      operators={[
+        { _id: "operator-1", name: "Original Operator", active: true },
+        { _id: "operator-2", name: "New Operator", active: true },
+      ]}
+      vehicles={[{ _id: "vehicle-1", code: "BUS-1", active: true }]}
     />
   );
 
-  fireEvent.blur(screen.getByDisplayValue("Original Operator"), { target: { value: "New Operator" } });
+  fireEvent.change(screen.getByLabelText("Driver for 500A"), { target: { value: "operator-2" } });
   expect(onPatch).toHaveBeenCalledWith(expect.objectContaining({ _id: row._id }), {
-    operatorName: "New Operator",
+    operatorId: "operator-2",
   });
+  expect(screen.getByText("100 Main St")).toBeInTheDocument();
   expect(screen.queryByLabelText(/Route type/)).not.toBeInTheDocument();
   expect(screen.queryByTitle("MON")).not.toBeInTheDocument();
 });

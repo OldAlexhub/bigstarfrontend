@@ -8,9 +8,8 @@ import { DAYS_OF_WEEK } from "../../utils/dates";
 const emptyNewRoute = {
   code: "",
   type: "standard",
-  operatorName: "",
-  vehicleCode: "",
-  pulloutAddress: "",
+  operatorId: "",
+  vehicleId: "",
   startTime: "",
   endTime: "",
   daysOfWeek: [],
@@ -25,6 +24,7 @@ const RunCutsTable = () => {
   const [error, setError] = useState("");
   const [savingId, setSavingId] = useState(null);
   const { begin, isCurrent } = useLatestRequest();
+  const operatorsRequest = useLatestRequest();
   const vehiclesRequest = useLatestRequest();
 
   const [showAddRoute, setShowAddRoute] = useState(false);
@@ -56,10 +56,18 @@ const RunCutsTable = () => {
   useEffect(load, [selectedDivision, isAllDivisions]);
 
   useEffect(() => {
-    apiGet("/api/operators")
-      .then((data) => setOperators(data.operators))
+    if (!selectedDivision) return;
+    const requestId = operatorsRequest.begin();
+    const url = isAllDivisions
+      ? "/api/operators"
+      : `/api/operators?division=${selectedDivision._id}`;
+    apiGet(url)
+      .then((data) => {
+        if (operatorsRequest.isCurrent(requestId)) setOperators(data.operators || []);
+      })
       .catch(() => {});
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDivision, isAllDivisions]);
 
   useEffect(() => {
     if (!selectedDivision) return;
@@ -67,7 +75,7 @@ const RunCutsTable = () => {
     const url = isAllDivisions ? "/api/vehicles" : `/api/vehicles?division=${selectedDivision._id}`;
     apiGet(url)
       .then((data) => {
-        if (vehiclesRequest.isCurrent(requestId)) setVehicles(data.vehicles);
+        if (vehiclesRequest.isCurrent(requestId)) setVehicles(data.vehicles || []);
       })
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -130,9 +138,8 @@ const RunCutsTable = () => {
       await apiPost("/api/run-cuts", {
         division: selectedDivision._id,
         route: routeData.route._id,
-        operatorName: newRoute.operatorName,
-        vehicleCode: newRoute.vehicleCode,
-        pulloutAddress: newRoute.pulloutAddress,
+        operatorId: newRoute.operatorId,
+        vehicleId: newRoute.vehicleId,
         startTime: newRoute.startTime || null,
         endTime: newRoute.endTime || null,
         daysOfWeek: newRoute.daysOfWeek,
@@ -236,31 +243,38 @@ const RunCutsTable = () => {
               </select>
             </label>
             <label className="text-sm text-slate-600">
-              Operator
-              <input
-                list="rct-operators"
-                value={newRoute.operatorName}
-                onChange={(e) => setNewRoute({ ...newRoute, operatorName: e.target.value })}
-                placeholder="Type a name…"
-                className="mt-1 block w-44 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
-              />
+              Driver
+              <select
+                value={newRoute.operatorId}
+                onChange={(e) => setNewRoute({ ...newRoute, operatorId: e.target.value })}
+                className="mt-1 block w-48 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm"
+              >
+                <option value="">Unassigned</option>
+                {operators.filter((operator) => operator.active !== false).map((operator) => (
+                  <option key={operator._id} value={operator._id}>{operator.name}</option>
+                ))}
+              </select>
             </label>
             <label className="text-sm text-slate-600">
               Vehicle
-              <input
-                list="rct-vehicles"
-                value={newRoute.vehicleCode}
-                onChange={(e) => setNewRoute({ ...newRoute, vehicleCode: e.target.value })}
-                placeholder="Type a code…"
-                className="mt-1 block w-32 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
-              />
+              <select
+                value={newRoute.vehicleId}
+                onChange={(e) => setNewRoute({ ...newRoute, vehicleId: e.target.value })}
+                className="mt-1 block w-36 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm"
+              >
+                <option value="">Unassigned</option>
+                {vehicles.filter((vehicle) => vehicle.active !== false).map((vehicle) => (
+                  <option key={vehicle._id} value={vehicle._id}>{vehicle.code}</option>
+                ))}
+              </select>
             </label>
             <label className="text-sm text-slate-600">
               Pullout address
               <input
-                value={newRoute.pulloutAddress}
-                onChange={(e) => setNewRoute({ ...newRoute, pulloutAddress: e.target.value })}
-                className="mt-1 block w-56 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                value={operators.find((operator) => operator._id === newRoute.operatorId)?.pulloutAddress || ""}
+                readOnly
+                placeholder="Set by driver"
+                className="mt-1 block w-56 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-600"
               />
             </label>
             <label className="text-sm text-slate-600">

@@ -292,9 +292,8 @@ const OsrPlanner = ({ selectedDivision, advanceDays, onProcessed }) => {
 
 const emptyExtra = {
   routeId: "",
-  operatorName: "",
-  vehicleCode: "",
-  pulloutAddress: "",
+  operatorId: "",
+  vehicleId: "",
   startTime: "",
   endTime: "",
   notes: "",
@@ -320,6 +319,7 @@ const LiveSchedule = () => {
   const [savingId, setSavingId] = useState(null);
   const { begin, isCurrent } = useLatestRequest();
   const routesRequest = useLatestRequest();
+  const operatorsRequest = useLatestRequest();
   const vehiclesRequest = useLatestRequest();
   const runCutsRequest = useLatestRequest();
 
@@ -353,9 +353,6 @@ const LiveSchedule = () => {
   useEffect(load, [selectedDivision, dateStr]);
 
   useEffect(() => {
-    apiGet("/api/operators")
-      .then((data) => setOperators(data.operators))
-      .catch(() => {});
     apiGet("/api/settings")
       .then((data) => setOsrAdvanceDays(data.settings?.osrAdvanceDays ?? 7))
       .catch(() => {});
@@ -363,10 +360,21 @@ const LiveSchedule = () => {
 
   useEffect(() => {
     if (!selectedDivision) return;
+    const requestId = operatorsRequest.begin();
+    apiGet(`/api/operators?division=${selectedDivision._id}`)
+      .then((data) => {
+        if (operatorsRequest.isCurrent(requestId)) setOperators(data.operators || []);
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDivision]);
+
+  useEffect(() => {
+    if (!selectedDivision) return;
     const requestId = vehiclesRequest.begin();
     apiGet(`/api/vehicles?division=${selectedDivision._id}`)
       .then((data) => {
-        if (vehiclesRequest.isCurrent(requestId)) setVehicles(data.vehicles);
+        if (vehiclesRequest.isCurrent(requestId)) setVehicles(data.vehicles || []);
       })
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -431,9 +439,8 @@ const LiveSchedule = () => {
         division: selectedDivision._id,
         date: dateStr,
         routeId: newExtra.routeId,
-        operatorName: newExtra.operatorName,
-        vehicleCode: newExtra.vehicleCode,
-        pulloutAddress: newExtra.pulloutAddress,
+        operatorId: newExtra.operatorId,
+        vehicleId: newExtra.vehicleId,
         startTime: newExtra.startTime || null,
         endTime: newExtra.endTime || null,
         notes: newExtra.notes,
@@ -459,17 +466,6 @@ const LiveSchedule = () => {
 
   return (
     <div>
-      <datalist id="dep-operators">
-        {operators.map((o) => (
-          <option key={o._id} value={o.name} />
-        ))}
-      </datalist>
-      <datalist id="dep-vehicles">
-        {vehicles.map((v) => (
-          <option key={v._id} value={v.code} />
-        ))}
-      </datalist>
-
       <OsrPlanner
         selectedDivision={selectedDivision}
         advanceDays={osrAdvanceDays}
@@ -519,9 +515,8 @@ const LiveSchedule = () => {
                   setNewExtra({
                     ...emptyExtra,
                     routeId,
-                    operatorName: assignment?.operator?.name || "",
-                    vehicleCode: assignment?.vehicle?.code || "",
-                    pulloutAddress: assignment?.pulloutAddress || "",
+                    operatorId: assignment?.operator?._id || "",
+                    vehicleId: assignment?.vehicle?._id || "",
                     startTime: assignment?.startTime || "",
                     endTime: assignment?.endTime || "",
                   });
@@ -536,31 +531,38 @@ const LiveSchedule = () => {
               </select>
             </label>
             <label className="text-sm text-slate-600">
-              Operator
-              <input
-                list="dep-operators"
-                value={newExtra.operatorName}
-                onChange={(e) => setNewExtra({ ...newExtra, operatorName: e.target.value })}
-                placeholder="Type a name…"
-                className="mt-1 block w-44 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
-              />
+              Driver
+              <select
+                value={newExtra.operatorId}
+                onChange={(e) => setNewExtra({ ...newExtra, operatorId: e.target.value })}
+                className="mt-1 block w-48 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm"
+              >
+                <option value="">Unassigned</option>
+                {operators.filter((operator) => operator.active !== false).map((operator) => (
+                  <option key={operator._id} value={operator._id}>{operator.name}</option>
+                ))}
+              </select>
             </label>
             <label className="text-sm text-slate-600">
               Vehicle
-              <input
-                list="dep-vehicles"
-                value={newExtra.vehicleCode}
-                onChange={(e) => setNewExtra({ ...newExtra, vehicleCode: e.target.value })}
-                placeholder="Type a code…"
-                className="mt-1 block w-32 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
-              />
+              <select
+                value={newExtra.vehicleId}
+                onChange={(e) => setNewExtra({ ...newExtra, vehicleId: e.target.value })}
+                className="mt-1 block w-36 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm"
+              >
+                <option value="">Unassigned</option>
+                {vehicles.filter((vehicle) => vehicle.active !== false).map((vehicle) => (
+                  <option key={vehicle._id} value={vehicle._id}>{vehicle.code}</option>
+                ))}
+              </select>
             </label>
             <label className="text-sm text-slate-600">
               Pullout address
               <input
-                value={newExtra.pulloutAddress}
-                onChange={(e) => setNewExtra({ ...newExtra, pulloutAddress: e.target.value })}
-                className="mt-1 block w-56 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                value={operators.find((operator) => operator._id === newExtra.operatorId)?.pulloutAddress || ""}
+                readOnly
+                placeholder="Set by driver"
+                className="mt-1 block w-56 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-600"
               />
             </label>
             <label className="text-sm text-slate-600">

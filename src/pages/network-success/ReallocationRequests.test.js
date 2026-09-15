@@ -45,9 +45,17 @@ describe("Network Success reallocation requests", () => {
     apiPost.mockReset();
     apiGet.mockImplementation((path) => {
       if (path === "/api/divisions") return Promise.resolve({ divisions: [{ _id: "division-1", name: "East", timezone: "America/New_York" }] });
-      if (path === "/api/operators") return Promise.resolve({ operators: [] });
+      if (path === "/api/operators") return Promise.resolve({
+        operators: [{
+          _id: "operator-2",
+          name: "Taylor Driver",
+          division: { _id: "division-1", name: "East" },
+          pulloutAddress: "500 Depot Way",
+          active: true,
+        }],
+      });
       if (path.startsWith("/api/run-cuts")) return Promise.resolve({ runCuts });
-      if (path.startsWith("/api/vehicles")) return Promise.resolve({ vehicles: [] });
+      if (path.startsWith("/api/vehicles")) return Promise.resolve({ vehicles: [{ _id: "vehicle-1", code: "V-12", active: true }] });
       if (path.startsWith("/api/reallocation-requests")) return Promise.resolve({ requests: [] });
       return Promise.reject(new Error(`Unexpected request: ${path}`));
     });
@@ -114,6 +122,6 @@ describe("Network Success reallocation requests", () => {
     expect(screen.getByLabelText("Vehicle associated")).toBeEnabled();
     expect(screen.getByLabelText("Vehicle associated")).toHaveValue("V-12");
     expect(screen.getByLabelText("Pullout address")).toBeEnabled();
-    expect(screen.getByLabelText("Pullout address")).toHaveValue("100 Main St");
+    expect(screen.getByLabelText("Pullout address")).toHaveValue("500 Depot Way");
   });
 });

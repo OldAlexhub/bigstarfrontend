@@ -272,7 +272,13 @@ const NetworkPerformance = () => {
                           Operator
                           <select value={assignmentForm.operatorId} onChange={(event) => changeOperator(event.target.value)} className="mt-1 block min-w-56 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500">
                             <option value="">Unassigned</option>
-                            {operators.filter((item) => item.active !== false).map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
+                            {operators
+                              .filter(
+                                (item) =>
+                                  item.active !== false &&
+                                  String(item.division?._id || item.division || "") === String(division)
+                              )
+                              .map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
                           </select>
                         </label>
                         <button type="button" disabled={savingAssignment} onClick={() => saveAssignment(record)} className="rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50">Save and reuse</button>
