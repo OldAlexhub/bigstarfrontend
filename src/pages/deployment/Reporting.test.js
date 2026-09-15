@@ -30,7 +30,7 @@ const osrIssues = [
     date: "2026-09-15T00:00:00.000Z",
     route: { _id: "route-1", code: "R1" },
     operator: { _id: "operator-1", name: "Operator One" },
-    disruptionType: "OSR (Out of Service Request)",
+    disruptionType: "OSR (Orion Service Request)",
     notes: "Approved maintenance request",
   },
   {
@@ -88,7 +88,7 @@ test("Reporting summarizes processed OSRs and shows their daily schedule details
             startTime: "08:00",
             endTime: "16:00",
             status: "suspended",
-            disruptionType: "OSR (Out of Service Request)",
+            disruptionType: "OSR (Orion Service Request)",
             disruptionNotes: "Approved maintenance request",
           },
           {

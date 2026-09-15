@@ -47,7 +47,17 @@ vi.mock("../../components/RunCutDayTable", () => ({
 }));
 
 const originalRows = [
-  { _id: "open-1", route: { _id: "route-1", code: "OPEN-1" }, disposition: null },
+  {
+    _id: "open-1",
+    route: { _id: "route-1", code: "OPEN-1" },
+    operator: { _id: "operator-1", name: "Operator One" },
+    vehicle: { _id: "vehicle-1", code: "BUS-1" },
+    startTime: "08:00",
+    endTime: "16:00",
+    status: "active",
+    clientNotes: "",
+    disposition: null,
+  },
   { _id: "closed-1", route: { _id: "route-2", code: "CLOSED-1" }, disposition: "deployed_late" },
 ];
 
@@ -66,8 +76,14 @@ describe("Live Schedule today route tabs", () => {
         return Promise.resolve({ runCutDays: url.includes("includeStandby=1") ? standbyRows : storedRows });
       }
       if (url.startsWith("/api/routes")) return Promise.resolve({ routes: [] });
-      if (url.startsWith("/api/operators")) return Promise.resolve({ operators: [] });
-      if (url.startsWith("/api/vehicles")) return Promise.resolve({ vehicles: [] });
+      if (url.startsWith("/api/operators")) return Promise.resolve({ operators: [
+        { _id: "operator-1", name: "Operator One", pulloutAddress: "100 Main St", active: true },
+        { _id: "operator-2", name: "Operator Two", pulloutAddress: "200 Broad St", active: true },
+      ] });
+      if (url.startsWith("/api/vehicles")) return Promise.resolve({ vehicles: [
+        { _id: "vehicle-1", code: "BUS-1", active: true },
+        { _id: "vehicle-2", code: "BUS-2", active: true },
+      ] });
       if (url.startsWith("/api/run-cuts")) return Promise.resolve({ runCuts: [] });
       return Promise.reject(new Error(`Unexpected request: ${url}`));
     });
@@ -142,24 +158,49 @@ describe("Live Schedule today route tabs", () => {
     expect(screen.getByRole("button", { name: "Toggle CLOSED-1" })).toBeInTheDocument();
   });
 
-  test("processes an OSR for a selected future daily schedule without editing Master Run Cuts", async () => {
+  test("processes an Orion Service Request with future day-specific fields without forcing suspension", async () => {
     render(<LiveSchedule />);
-    fireEvent.click(await screen.findByRole("button", { name: /Out of Service Request/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Orion Service Request/ }));
 
     const processButton = await screen.findByRole("button", { name: "Process OSR" });
+    fireEvent.change(screen.getByLabelText("OSR driver"), { target: { value: "operator-2" } });
+    fireEvent.change(screen.getByLabelText("OSR vehicle"), { target: { value: "vehicle-2" } });
+    fireEvent.change(screen.getByLabelText("OSR start time"), { target: { value: "09:00" } });
+    fireEvent.change(screen.getByLabelText("OSR end time"), { target: { value: "17:00" } });
+    fireEvent.change(screen.getByLabelText("OSR client notes"), { target: { value: "Client approved" } });
     fireEvent.change(screen.getByLabelText("OSR notes"), { target: { value: "Approved service request" } });
+    expect(screen.getByLabelText("OSR pullout address")).toHaveValue("200 Broad St");
     fireEvent.click(processButton);
 
     await waitFor(() =>
       expect(apiPatch).toHaveBeenCalledWith(
         "/api/run-cut-days/open-1",
         expect.objectContaining({
-          disruptionType: "OSR (Out of Service Request)",
+          disruptionType: "OSR (Orion Service Request)",
           disruptionNotes: "Approved service request",
+          operatorId: "operator-2",
+          vehicleId: "vehicle-2",
+          startTime: "09:00",
+          endTime: "17:00",
+          status: "active",
+          clientNotes: "Client approved",
         })
       )
     );
     expect(await screen.findByText(/OSR processed for OPEN-1/)).toBeInTheDocument();
+  });
+
+  test("an Orion Service Request sends suspended only when selected explicitly", async () => {
+    render(<LiveSchedule />);
+    fireEvent.click(await screen.findByRole("button", { name: /Orion Service Request/ }));
+    const processButton = await screen.findByRole("button", { name: "Process OSR" });
+    fireEvent.change(screen.getByLabelText("OSR route status"), { target: { value: "suspended" } });
+    fireEvent.click(processButton);
+
+    await waitFor(() => expect(apiPatch).toHaveBeenCalledWith(
+      "/api/run-cut-days/open-1",
+      expect.objectContaining({ status: "suspended", disruptionType: "OSR (Orion Service Request)" })
+    ));
   });
 
   test("adds revenue only from an unscheduled route in the selected division pool", async () => {

@@ -3,7 +3,7 @@ import { useOutletContext } from "react-router-dom";
 import { apiGet, API_BASE } from "../../api/client";
 import MetricCard from "../../components/MetricCard";
 import { DISPOSITION_OPTIONS } from "../../config/dispositions";
-import { OSR_DISRUPTION_TYPE } from "../../config/disruptionTypes";
+import { isOsrDisruptionType } from "../../config/disruptionTypes";
 import { toISODate, todayInTimezone, addDays } from "../../utils/dates";
 import { useLatestRequest } from "../../hooks/useLatestRequest";
 
@@ -73,7 +73,7 @@ const Reporting = () => {
     });
 
   const osrRows = issues
-    .filter((issue) => issue.disruptionType === OSR_DISRUPTION_TYPE)
+    .filter((issue) => isOsrDisruptionType(issue.disruptionType))
     .map((issue) => {
       const matchingDay = runCutDays.find(
         (day) =>
@@ -218,7 +218,7 @@ const Reporting = () => {
       <section className="mb-8">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-sm font-semibold text-slate-900">Out of Service Requests (OSRs)</h2>
+            <h2 className="text-sm font-semibold text-slate-900">Orion Service Requests (OSRs)</h2>
             <p className="mt-1 text-xs text-slate-500">
               Daily-schedule OSRs with service dates in the selected reporting range.
             </p>

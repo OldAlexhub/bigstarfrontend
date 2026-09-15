@@ -19,7 +19,6 @@ import ScheduleHistory from "./pages/deployment/ScheduleHistory";
 import StandbyUtilization from "./pages/deployment/StandbyUtilization";
 import EltReporting from "./pages/EltReporting";
 import EltReportingLayout from "./pages/elt-reporting/EltReportingLayout";
-import CompanyOutlook from "./pages/elt-reporting/CompanyOutlook";
 import Leaderboard from "./pages/Leaderboard";
 import UserAdmin from "./pages/UserAdmin";
 import NetworkSuccessLayout from "./pages/network-success/NetworkSuccessLayout";
@@ -71,7 +70,6 @@ function App() {
           </Route>
           <Route path="/elt-reporting" element={<EltReportingLayout />}>
             <Route index element={<EltReporting />} />
-            <Route path="outlook" element={<CompanyOutlook />} />
           </Route>
           <Route path="/leaderboard" element={<Leaderboard />} />
           <Route path="/network-success" element={<NetworkSuccessLayout />}>

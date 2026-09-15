@@ -8,7 +8,6 @@ const EltReportingLayout = () => (
   <div>
     <div className="mb-6 flex gap-6 overflow-x-auto border-b border-slate-200 print:hidden">
       <NavLink to="/elt-reporting" end className={tabClasses}>Operations Report</NavLink>
-      <NavLink to="/elt-reporting/outlook" className={tabClasses}>Company Outlook</NavLink>
     </div>
     <Outlet />
   </div>

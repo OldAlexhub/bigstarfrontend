@@ -4,7 +4,8 @@ import { apiGet, apiPost, apiPatch, apiDelete } from "../../api/client";
 import { toISODate, todayInTimezone, addDays } from "../../utils/dates";
 import RunCutDayTable from "../../components/RunCutDayTable";
 import { useLatestRequest } from "../../hooks/useLatestRequest";
-import { OSR_DISRUPTION_TYPE } from "../../config/disruptionTypes";
+import { OSR_DISRUPTION_TYPE, isOsrDisruptionType } from "../../config/disruptionTypes";
+import { DISPOSITION_OPTIONS } from "../../config/dispositions";
 
 const StandbyPanel = ({ selectedDivision, targetDate, which, coverableRoutes, onCoverageChanged }) => {
   const [standbyDays, setStandbyDays] = useState([]);
@@ -137,7 +138,18 @@ const StandbyPanel = ({ selectedDivision, targetDate, which, coverableRoutes, on
   );
 };
 
-const OsrPlanner = ({ selectedDivision, advanceDays, onProcessed }) => {
+const osrFormForDay = (day) => ({
+  operatorId: day?.operator?._id || "",
+  vehicleId: day?.vehicle?._id || "",
+  startTime: day?.startTime || "",
+  endTime: day?.endTime || "",
+  status: day?.status || "active",
+  clientNotes: day?.clientNotes || "",
+  disruptionNotes: day?.disruptionNotes || "",
+  disposition: day?.disposition || "",
+});
+
+const OsrPlanner = ({ selectedDivision, advanceDays, operators, vehicles, onProcessed }) => {
   const today = todayInTimezone(selectedDivision?.timezone);
   const minDate = toISODate(today);
   const maxDate = toISODate(addDays(today, advanceDays));
@@ -146,7 +158,7 @@ const OsrPlanner = ({ selectedDivision, advanceDays, onProcessed }) => {
   const [serviceDate, setServiceDate] = useState(defaultDate);
   const [routeDays, setRouteDays] = useState([]);
   const [runCutDayId, setRunCutDayId] = useState("");
-  const [notes, setNotes] = useState("");
+  const [form, setForm] = useState(osrFormForDay(null));
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -156,7 +168,7 @@ const OsrPlanner = ({ selectedDivision, advanceDays, onProcessed }) => {
   useEffect(() => {
     setServiceDate(defaultDate);
     setRunCutDayId("");
-    setNotes("");
+    setForm(osrFormForDay(null));
     setMessage("");
   }, [defaultDate, selectedDivision?._id]);
 
@@ -170,9 +182,9 @@ const OsrPlanner = ({ selectedDivision, advanceDays, onProcessed }) => {
         if (!request.isCurrent(requestId)) return;
         const available = data.runCutDays.filter((day) => day.route?.type !== "standby");
         setRouteDays(available);
-        setRunCutDayId((current) =>
-          available.some((day) => day._id === current) ? current : available[0]?._id || ""
-        );
+        const initialDay = available[0] || null;
+        setRunCutDayId(initialDay?._id || "");
+        setForm(osrFormForDay(initialDay));
       })
       .catch((err) => {
         if (request.isCurrent(requestId)) setError(err.message);
@@ -192,10 +204,20 @@ const OsrPlanner = ({ selectedDivision, advanceDays, onProcessed }) => {
     setError("");
     setMessage("");
     try {
-      const data = await apiPatch(`/api/run-cut-days/${selectedRouteDay._id}`, {
+      const patch = {
         disruptionType: OSR_DISRUPTION_TYPE,
-        disruptionNotes: notes,
-      });
+        disruptionNotes: form.disruptionNotes,
+        operatorId: form.operatorId,
+        vehicleId: form.vehicleId,
+        startTime: form.startTime || null,
+        endTime: form.endTime || null,
+        status: form.status,
+        clientNotes: form.clientNotes,
+      };
+      if (form.status !== "suspended" || form.disposition === "closed_suspended") {
+        patch.disposition = form.disposition || null;
+      }
+      const data = await apiPatch(`/api/run-cut-days/${selectedRouteDay._id}`, patch);
       setRouteDays((current) =>
         current.map((day) => (day._id === data.runCutDay._id ? data.runCutDay : day))
       );
@@ -217,7 +239,7 @@ const OsrPlanner = ({ selectedDivision, advanceDays, onProcessed }) => {
         onClick={() => setExpanded((value) => !value)}
         className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold text-slate-900"
       >
-        <span>Out of Service Request (OSR) Planner</span>
+        <span>Orion Service Request (OSR) Planner</span>
         <span className="text-xs font-normal text-slate-500">
           {expanded ? "Close" : `Up to ${advanceDays} day${advanceDays === 1 ? "" : "s"} ahead`}
         </span>
@@ -225,13 +247,13 @@ const OsrPlanner = ({ selectedDivision, advanceDays, onProcessed }) => {
       {expanded && (
         <form onSubmit={processOsr} className="border-t border-blue-100 p-4">
           <p className="mb-3 text-xs text-slate-500">
-            Processing an OSR suspends only the selected daily schedule. It does not change Master Run Cuts.
+            Apply the requested day-specific service changes. The route remains operating unless you explicitly select a non-operating status.
           </p>
           {error && <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
           {message && (
             <p className="mb-3 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{message}</p>
           )}
-          <div className="flex flex-wrap items-end gap-3">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <label className="text-sm text-slate-600">
               Service date
               <input
@@ -252,6 +274,7 @@ const OsrPlanner = ({ selectedDivision, advanceDays, onProcessed }) => {
                 value={runCutDayId}
                 onChange={(event) => {
                   setRunCutDayId(event.target.value);
+                  setForm(osrFormForDay(routeDays.find((day) => day._id === event.target.value)));
                   setMessage("");
                 }}
                 disabled={loading || routeDays.length === 0}
@@ -262,26 +285,108 @@ const OsrPlanner = ({ selectedDivision, advanceDays, onProcessed }) => {
                 {routeDays.map((day) => (
                   <option key={day._id} value={day._id}>
                     {day.route?.code}
-                    {day.disruptionType === OSR_DISRUPTION_TYPE ? " (OSR processed)" : ""}
+                    {isOsrDisruptionType(day.disruptionType) ? " (OSR processed)" : ""}
                   </option>
                 ))}
               </select>
             </label>
             <label className="text-sm text-slate-600">
-              OSR notes
+              Driver
+              <select
+                aria-label="OSR driver"
+                value={form.operatorId}
+                onChange={(event) => setForm((current) => ({ ...current, operatorId: event.target.value }))}
+                className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              >
+                <option value="">— Unassigned —</option>
+                {operators.filter((operator) => operator.active !== false).map((operator) => (
+                  <option key={operator._id} value={operator._id}>{operator.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="text-sm text-slate-600">
+              Vehicle
+              <select
+                aria-label="OSR vehicle"
+                value={form.vehicleId}
+                onChange={(event) => setForm((current) => ({ ...current, vehicleId: event.target.value }))}
+                className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              >
+                <option value="">— Unassigned —</option>
+                {vehicles.filter((vehicle) => vehicle.active !== false).map((vehicle) => (
+                  <option key={vehicle._id} value={vehicle._id}>{vehicle.code}</option>
+                ))}
+              </select>
+            </label>
+            <label className="text-sm text-slate-600">
+              Pullout address
               <input
-                value={notes}
-                onChange={(event) => setNotes(event.target.value)}
-                placeholder="Request details"
-                className="mt-1 block w-64 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                aria-label="OSR pullout address"
+                value={operators.find((operator) => operator._id === form.operatorId)?.pulloutAddress || ""}
+                readOnly
+                placeholder="Derived from driver"
+                className="mt-1 block w-full rounded-md border border-slate-200 bg-slate-100 px-2 py-1.5 text-sm text-slate-500"
               />
+            </label>
+            <label className="text-sm text-slate-600">
+              Start time
+              <input type="time" aria-label="OSR start time" value={form.startTime} onChange={(event) => setForm((current) => ({ ...current, startTime: event.target.value }))} className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm" />
+            </label>
+            <label className="text-sm text-slate-600">
+              End time
+              <input type="time" aria-label="OSR end time" value={form.endTime} onChange={(event) => setForm((current) => ({ ...current, endTime: event.target.value }))} className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm" />
+            </label>
+            <label className="text-sm text-slate-600">
+              Route status
+              <select
+                aria-label="OSR route status"
+                value={form.status}
+                onChange={(event) => setForm((current) => ({
+                  ...current,
+                  status: event.target.value,
+                  disposition: event.target.value === "suspended"
+                    ? "closed_suspended"
+                    : current.disposition === "closed_suspended" ? "" : current.disposition,
+                }))}
+                className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              >
+                <option value="active">Active</option>
+                <option value="unassigned">Unassigned</option>
+                <option value="suspended">Suspended</option>
+                <option value="off">Off</option>
+                <option value="add_rte">Additional revenue route</option>
+              </select>
+            </label>
+            <label className="text-sm text-slate-600">
+              Disposition
+              <select
+                aria-label="OSR disposition"
+                value={form.disposition}
+                onChange={(event) => setForm((current) => ({
+                  ...current,
+                  disposition: event.target.value,
+                  status: event.target.value === "closed_suspended" ? "suspended" : current.status,
+                }))}
+                className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              >
+                <option value="">— Not dispositioned —</option>
+                {DISPOSITION_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+            </label>
+            <label className="text-sm text-slate-600 md:col-span-2">
+              Client notes
+              <input aria-label="OSR client notes" value={form.clientNotes} onChange={(event) => setForm((current) => ({ ...current, clientNotes: event.target.value }))} className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm" />
+            </label>
+            <label className="text-sm text-slate-600 md:col-span-2">
+              OSR notes
+              <input aria-label="OSR notes" value={form.disruptionNotes} onChange={(event) => setForm((current) => ({ ...current, disruptionNotes: event.target.value }))} placeholder="Request details" className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm" />
             </label>
             <button
               type="submit"
               disabled={saving || loading || !runCutDayId}
               className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
             >
-              {saving ? "Processing…" : selectedRouteDay?.disruptionType === OSR_DISRUPTION_TYPE ? "Update OSR" : "Process OSR"}
+              {saving ? "Processing…" : isOsrDisruptionType(selectedRouteDay?.disruptionType) ? "Update OSR" : "Process OSR"}
             </button>
           </div>
         </form>
@@ -469,6 +574,8 @@ const LiveSchedule = () => {
       <OsrPlanner
         selectedDivision={selectedDivision}
         advanceDays={osrAdvanceDays}
+        operators={operators}
+        vehicles={vehicles}
         onProcessed={(serviceDate) => {
           if (serviceDate === dateStr) load();
         }}
