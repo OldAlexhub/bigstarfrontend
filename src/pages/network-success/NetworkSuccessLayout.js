@@ -1,19 +1,30 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { apiGet } from "../../api/client";
 import { REALLOCATION_UPDATED_EVENT } from "../reallocationUi";
 import { TEAM_POST_UPDATED_EVENT } from "../posts/postUi";
+import { playNotificationSound } from "../../utils/notificationSound";
+import { clearTabNotificationCount, setTabNotificationCount } from "../../utils/tabNotifications";
 
 const NetworkSuccessLayout = () => {
   const [acceptedCount, setAcceptedCount] = useState(0);
   const [postCount, setPostCount] = useState(0);
+  const acceptedCountRef = useRef(null);
+  const postCountRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
     const loadNotifications = () => {
       apiGet("/api/reallocation-requests/notifications")
         .then((data) => {
-          if (!cancelled) setAcceptedCount(data.count || 0);
+          if (cancelled) return;
+          const nextCount = data.count || 0;
+          if (acceptedCountRef.current !== null && nextCount > acceptedCountRef.current) {
+            playNotificationSound();
+          }
+          acceptedCountRef.current = nextCount;
+          setAcceptedCount(nextCount);
+          setTabNotificationCount("network-accepted", nextCount);
         })
         .catch(() => {});
     };
@@ -26,6 +37,7 @@ const NetworkSuccessLayout = () => {
       window.clearInterval(interval);
       window.removeEventListener("focus", loadNotifications);
       window.removeEventListener(REALLOCATION_UPDATED_EVENT, loadNotifications);
+      clearTabNotificationCount("network-accepted");
     };
   }, []);
 
@@ -34,7 +46,14 @@ const NetworkSuccessLayout = () => {
     const loadNotifications = () => {
       apiGet("/api/team-posts/notifications?section=network_success")
         .then((data) => {
-          if (!cancelled) setPostCount(data.count || 0);
+          if (cancelled) return;
+          const nextCount = data.count || 0;
+          if (postCountRef.current !== null && nextCount > postCountRef.current) {
+            playNotificationSound();
+          }
+          postCountRef.current = nextCount;
+          setPostCount(nextCount);
+          setTabNotificationCount("network-posts", nextCount);
         })
         .catch(() => {});
     };
@@ -47,6 +66,7 @@ const NetworkSuccessLayout = () => {
       window.clearInterval(interval);
       window.removeEventListener("focus", loadNotifications);
       window.removeEventListener(TEAM_POST_UPDATED_EVENT, loadNotifications);
+      clearTabNotificationCount("network-posts");
     };
   }, []);
 

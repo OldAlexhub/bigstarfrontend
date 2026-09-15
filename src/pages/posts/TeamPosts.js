@@ -67,30 +67,30 @@ const PostCard = ({ post, section, onResponded, onError }) => {
   const recipientTeam = POST_SECTION_LABELS[post.toSection] || post.toSection;
 
   return (
-    <article className={`rounded-xl border bg-white p-4 shadow-sm ${post.unread ? "border-brand-300 ring-1 ring-brand-100" : "border-slate-200"}`}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">{post.purpose}</span>
-            {post.unread && <span className="rounded-full bg-red-600 px-2 py-1 text-xs font-semibold text-white">New</span>}
-            <span className={`rounded-full px-2 py-1 text-xs font-medium ${post.responseRequested ? "bg-amber-100 text-amber-800" : "bg-blue-50 text-blue-700"}`}>
-              {post.responseRequested ? (post.status === "responded" ? "Response received" : "Response requested") : "Information only"}
+    <article className={`rounded-lg border bg-white px-3 py-2.5 text-sm shadow-sm ${post.unread ? "border-brand-300 ring-1 ring-brand-100" : "border-slate-200"}`}>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+          <span className="truncate font-semibold text-slate-900">{post.title}</span>
+          <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-500">{post.purpose}</span>
+          {post.unread && <span className="shrink-0 rounded-full bg-red-600 px-1.5 py-0.5 text-[11px] font-semibold text-white">New</span>}
+          {post.responseRequested && (
+            <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[11px] font-medium ${post.status === "responded" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-800"}`}>
+              {post.status === "responded" ? "Responded" : "Response requested"}
             </span>
-          </div>
-          <h4 className="mt-2 text-base font-semibold text-slate-900">{post.title}</h4>
+          )}
         </div>
-        <span className="text-xs text-slate-400">{formatPostDateTime(post.createdAt)}</span>
+        <span className="shrink-0 text-[11px] text-slate-400">{formatPostDateTime(post.createdAt)}</span>
       </div>
-      <p className="mt-3 whitespace-pre-wrap break-words text-sm text-slate-700">{post.body}</p>
-      <div className="mt-4 border-t border-slate-100 pt-3 text-xs text-slate-500">
-        Sent by <span className="font-medium text-slate-700">{formatPostPerson(post, "sent")}</span> from {senderTeam} to {recipientTeam} on {formatPostDateTime(post.createdAt)}.
-      </div>
+      <p className="mt-1 whitespace-pre-wrap break-words text-slate-700">{post.body}</p>
+      <p className="mt-1 truncate text-[11px] text-slate-400">
+        {formatPostPerson(post, "sent")} · {senderTeam} → {recipientTeam}
+      </p>
 
       {post.status === "responded" && (
-        <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-          <p className="text-sm text-emerald-900">{post.responseBody}</p>
-          <p className="mt-2 text-xs text-emerald-700">
-            Responded by <span className="font-medium">{formatPostPerson(post, "responded")}</span> on {formatPostDateTime(post.respondedAt)}.
+        <div className="mt-2 rounded-md border-l-2 border-emerald-300 bg-emerald-50 px-2.5 py-1.5">
+          <p className="text-slate-800">{post.responseBody}</p>
+          <p className="mt-1 text-[11px] text-emerald-700">
+            {formatPostPerson(post, "responded")} · {formatPostDateTime(post.respondedAt)}
           </p>
         </div>
       )}
@@ -99,6 +99,49 @@ const PostCard = ({ post, section, onResponded, onError }) => {
         <ResponseEditor post={post} section={section} onResponded={onResponded} onError={onError} />
       )}
     </article>
+  );
+};
+
+const POST_PAGE_SIZE = 3;
+
+const PostList = ({ posts, emptyLabel, section, onResponded, onError }) => {
+  const [page, setPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(posts.length / POST_PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedPosts = posts.slice((currentPage - 1) * POST_PAGE_SIZE, currentPage * POST_PAGE_SIZE);
+
+  return (
+    <div>
+      <div className="space-y-2">
+        {posts.length === 0 && <p className="rounded-xl border border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-400">{emptyLabel}</p>}
+        {pagedPosts.map((post) => (
+          <PostCard key={post._id} post={post} section={section} onResponded={onResponded} onError={onError} />
+        ))}
+      </div>
+      {totalPages > 1 && (
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage <= 1}
+            className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            ← Previous
+          </button>
+          <span className="text-xs text-slate-500">
+            Page {currentPage} of {totalPages} · {posts.length} message{posts.length === 1 ? "" : "s"}
+          </span>
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage >= totalPages}
+            className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Next →
+          </button>
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -112,6 +155,9 @@ const TeamPosts = ({ section, fixedDivision = null }) => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [notice, setNotice] = useState("");
+  const [activeTab, setActiveTab] = useState("received");
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   useEffect(() => {
     if (fixedDivision) {
@@ -188,6 +234,32 @@ const TeamPosts = ({ section, fixedDivision = null }) => {
 
   const sentPosts = useMemo(() => posts.filter((post) => post.direction === "sent"), [posts]);
   const receivedPosts = useMemo(() => posts.filter((post) => post.direction === "received"), [posts]);
+  const receivedUnreadCount = useMemo(() => receivedPosts.filter((post) => post.unread).length, [receivedPosts]);
+  const sentUnreadCount = useMemo(() => sentPosts.filter((post) => post.unread).length, [sentPosts]);
+
+  const activePosts = activeTab === "received" ? receivedPosts : sentPosts;
+
+  const filteredPosts = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return activePosts.filter((post) => {
+      if (statusFilter === "unread" && !post.unread) return false;
+      if (statusFilter === "requested" && !(post.responseRequested && post.status !== "responded")) return false;
+      if (statusFilter === "responded" && post.status !== "responded") return false;
+      if (!query) return true;
+      const haystack = [
+        post.title,
+        post.body,
+        post.purpose,
+        post.responseBody,
+        formatPostPerson(post, "sent"),
+        formatPostPerson(post, "responded"),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [activePosts, search, statusFilter]);
 
   const submitPost = async (event) => {
     event.preventDefault();
@@ -235,7 +307,78 @@ const TeamPosts = ({ section, fixedDivision = null }) => {
         </div>
       )}
 
-      <form onSubmit={submitPost} className="mb-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      {loading ? <p className="text-sm text-slate-500">Loading posts…</p> : (
+        <section className="mb-8">
+          <div className="mb-3 flex flex-wrap items-center gap-3">
+            <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
+              <button
+                type="button"
+                onClick={() => setActiveTab("received")}
+                className={`inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  activeTab === "received" ? "bg-brand-500 text-white" : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                Received
+                {receivedUnreadCount > 0 && (
+                  <span className={`inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[11px] font-semibold leading-none ${activeTab === "received" ? "bg-white/25 text-white" : "bg-red-600 text-white"}`}>
+                    {receivedUnreadCount > 99 ? "99+" : receivedUnreadCount}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("sent")}
+                className={`inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  activeTab === "sent" ? "bg-brand-500 text-white" : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                Sent &amp; responses
+                {sentUnreadCount > 0 && (
+                  <span className={`inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[11px] font-semibold leading-none ${activeTab === "sent" ? "bg-white/25 text-white" : "bg-red-600 text-white"}`}>
+                    {sentUnreadCount > 99 ? "99+" : sentUnreadCount}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            <input
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search title, message, purpose, or person…"
+              className="min-w-[220px] flex-1 rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            />
+
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+              className="rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            >
+              <option value="all">All statuses</option>
+              <option value="unread">Unread</option>
+              <option value="requested">Needs response</option>
+              <option value="responded">Responded</option>
+            </select>
+          </div>
+
+          <PostList
+            key={`${activeTab}-${search}-${statusFilter}-${divisionId}`}
+            posts={filteredPosts}
+            emptyLabel={
+              search.trim() || statusFilter !== "all"
+                ? "No messages match your search or filter."
+                : activeTab === "received"
+                  ? "No posts received for this division."
+                  : "No posts sent for this division."
+            }
+            section={section}
+            onResponded={responded}
+            onError={setError}
+          />
+        </section>
+      )}
+
+      <form onSubmit={submitPost} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <h3 className="mb-4 text-lg font-semibold text-slate-900">Make a post</h3>
         <div className="grid gap-4 md:grid-cols-2">
           <label className="text-sm font-medium text-slate-700">
@@ -305,28 +448,6 @@ const TeamPosts = ({ section, fixedDivision = null }) => {
           </button>
         </div>
       </form>
-
-      {loading ? <p className="text-sm text-slate-500">Loading posts…</p> : (
-        <div className="grid gap-8 xl:grid-cols-2">
-          <section>
-            <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold text-slate-900">
-              Received
-              {receivedPosts.some((post) => post.unread) && <span className="rounded-full bg-red-600 px-2 py-0.5 text-xs font-semibold text-white">New</span>}
-            </h3>
-            <div className="space-y-3">
-              {receivedPosts.length === 0 && <p className="rounded-xl border border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-400">No posts received for this division.</p>}
-              {receivedPosts.map((post) => <PostCard key={post._id} post={post} section={section} onResponded={responded} onError={setError} />)}
-            </div>
-          </section>
-          <section>
-            <h3 className="mb-3 text-lg font-semibold text-slate-900">Sent &amp; response history</h3>
-            <div className="space-y-3">
-              {sentPosts.length === 0 && <p className="rounded-xl border border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-400">No posts sent for this division.</p>}
-              {sentPosts.map((post) => <PostCard key={post._id} post={post} section={section} onResponded={responded} onError={setError} />)}
-            </div>
-          </section>
-        </div>
-      )}
     </div>
   );
 };

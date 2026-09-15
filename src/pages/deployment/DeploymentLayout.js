@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useSearchParams } from "react-router-dom";
 import { apiGet } from "../../api/client";
 import { REALLOCATION_UPDATED_EVENT } from "../reallocationUi";
 import { TEAM_POST_UPDATED_EVENT } from "../posts/postUi";
+import { playNotificationSound } from "../../utils/notificationSound";
+import { clearTabNotificationCount, setTabNotificationCount } from "../../utils/tabNotifications";
 
 const TABS = [
   { to: "/deployment", label: "Live Schedule", end: true },
@@ -58,15 +60,22 @@ const DeploymentLayout = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const postCountRef = useRef(null);
+
   useEffect(() => {
     let cancelled = false;
     const loadPostCount = () => {
       apiGet("/api/team-posts/notifications?section=deployment")
         .then((data) => {
-          if (!cancelled) {
-            setPostCount(data.count || 0);
-            setPostByDivision(data.byDivision || {});
+          if (cancelled) return;
+          const nextCount = data.count || 0;
+          if (postCountRef.current !== null && nextCount > postCountRef.current) {
+            playNotificationSound();
           }
+          postCountRef.current = nextCount;
+          setPostCount(nextCount);
+          setPostByDivision(data.byDivision || {});
+          setTabNotificationCount("deployment-posts", nextCount);
         })
         .catch(() => {});
     };
@@ -79,20 +88,28 @@ const DeploymentLayout = () => {
       window.clearInterval(interval);
       window.removeEventListener("focus", loadPostCount);
       window.removeEventListener(TEAM_POST_UPDATED_EVENT, loadPostCount);
+      clearTabNotificationCount("deployment-posts");
     };
   }, []);
 
   const selectedDivision = divisions.find((d) => d._id === selectedDivisionId) || null;
+
+  const pendingRequestCountRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
     const loadPendingCount = () => {
       apiGet("/api/reallocation-requests/pending-notifications")
         .then((data) => {
-          if (!cancelled) {
-            setPendingRequestCount(data.count || 0);
-            setPendingByDivision(data.byDivision || {});
+          if (cancelled) return;
+          const nextCount = data.count || 0;
+          if (pendingRequestCountRef.current !== null && nextCount > pendingRequestCountRef.current) {
+            playNotificationSound();
           }
+          pendingRequestCountRef.current = nextCount;
+          setPendingRequestCount(nextCount);
+          setPendingByDivision(data.byDivision || {});
+          setTabNotificationCount("deployment-requests", nextCount);
         })
         .catch(() => {});
     };
@@ -105,6 +122,7 @@ const DeploymentLayout = () => {
       window.clearInterval(interval);
       window.removeEventListener("focus", loadPendingCount);
       window.removeEventListener(REALLOCATION_UPDATED_EVENT, loadPendingCount);
+      clearTabNotificationCount("deployment-requests");
     };
   }, []);
 
