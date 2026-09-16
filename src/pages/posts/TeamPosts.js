@@ -65,12 +65,16 @@ const PostCard = ({ post, section, onResponded, onError }) => {
   const incoming = post.direction === "received";
   const senderTeam = POST_SECTION_LABELS[post.fromSection] || post.fromSection;
   const recipientTeam = POST_SECTION_LABELS[post.toSection] || post.toSection;
+  const divisionName = post.division?.name || post.division?.code || "Unknown division";
 
   return (
     <article className={`rounded-lg border bg-white px-3 py-2.5 text-sm shadow-sm ${post.unread ? "border-brand-300 ring-1 ring-brand-100" : "border-slate-200"}`}>
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           <span className="truncate font-semibold text-slate-900">{post.title}</span>
+          <span className="shrink-0 rounded-full bg-violet-100 px-1.5 py-0.5 text-[11px] font-semibold text-violet-700">
+            {divisionName}
+          </span>
           <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-500">{post.purpose}</span>
           {post.unread && <span className="shrink-0 rounded-full bg-red-600 px-1.5 py-0.5 text-[11px] font-semibold text-white">New</span>}
           {post.responseRequested && (
@@ -253,6 +257,8 @@ const TeamPosts = ({ section, fixedDivision = null }) => {
         post.responseBody,
         formatPostPerson(post, "sent"),
         formatPostPerson(post, "responded"),
+        post.division?.name,
+        post.division?.code,
       ]
         .filter(Boolean)
         .join(" ")
@@ -307,8 +313,9 @@ const TeamPosts = ({ section, fixedDivision = null }) => {
         </div>
       )}
 
-      {loading ? <p className="text-sm text-slate-500">Loading posts…</p> : (
-        <section className="mb-8">
+      <div className="flex flex-col">
+      {loading ? <p className="order-2 text-sm text-slate-500">Loading posts…</p> : (
+        <section className="order-2">
           <div className="mb-3 flex flex-wrap items-center gap-3">
             <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
               <button
@@ -378,7 +385,7 @@ const TeamPosts = ({ section, fixedDivision = null }) => {
         </section>
       )}
 
-      <form onSubmit={submitPost} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <form onSubmit={submitPost} className="order-1 mb-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <h3 className="mb-4 text-lg font-semibold text-slate-900">Make a post</h3>
         <div className="grid gap-4 md:grid-cols-2">
           <label className="text-sm font-medium text-slate-700">
@@ -448,6 +455,7 @@ const TeamPosts = ({ section, fixedDivision = null }) => {
           </button>
         </div>
       </form>
+      </div>
     </div>
   );
 };

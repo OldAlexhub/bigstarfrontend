@@ -79,3 +79,26 @@ export const apiPatch = (path, body) => request(path, { method: "PATCH", body: J
 export const apiPut = (path, body) => request(path, { method: "PUT", body: JSON.stringify(body) });
 
 export const apiDelete = (path) => request(path, { method: "DELETE" });
+
+export const apiDownload = async (path) => {
+  const headers = new Headers();
+  const token = getAuthToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+
+  const res = await fetch(`${API_BASE}${path}`, {
+    credentials: "include",
+    headers,
+  });
+  if (!res.ok) {
+    if (res.status === 401) reportUnauthorized();
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || `Download failed (${res.status})`);
+  }
+
+  const disposition = res.headers.get("Content-Disposition") || "";
+  const match = disposition.match(/filename="([^"]+)"/);
+  return {
+    blob: await res.blob(),
+    filename: match?.[1] || "download",
+  };
+};

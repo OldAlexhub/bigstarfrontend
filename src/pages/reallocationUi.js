@@ -12,6 +12,9 @@ export const formatDateTime = (value) => (value ? new Date(value).toLocaleString
 
 export const formatEffectiveDate = (value) => String(value || "").slice(0, 10) || "—";
 
+export const requestDivisionLabel = (request) =>
+  request.division?.name || request.division?.code || "Unknown division";
+
 export const assignmentSummary = (request, prefix = "requested") => {
   const title = {
     original: "Current",
@@ -48,7 +51,7 @@ export const ReallocationAuditTrail = ({ requests }) => (
   <div className="mt-3 space-y-2">
     {requests.map((request) => (
       <div key={`${request._id}-audit`} className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
-        <span className="font-medium text-slate-900">Route {requestRouteLabel(request)}</span>: submitted by {formatRequestPerson(request, "requested")} on {formatDateTime(request.createdAt)}; accepted by {formatRequestPerson(request, "reviewed")} on {formatDateTime(request.reviewedAt)}{request.appliedAt ? `; applied ${formatDateTime(request.appliedAt)}` : `; scheduled for ${formatEffectiveDate(request.effectiveDate)}`}.
+        <span className="font-medium text-slate-900">{requestDivisionLabel(request)} · Route {requestRouteLabel(request)}</span>: submitted by {formatRequestPerson(request, "requested")} on {formatDateTime(request.createdAt)}; accepted by {formatRequestPerson(request, "reviewed")} on {formatDateTime(request.reviewedAt)}{request.appliedAt ? `; applied ${formatDateTime(request.appliedAt)}` : `; scheduled for ${formatEffectiveDate(request.effectiveDate)}`}.
       </div>
     ))}
   </div>

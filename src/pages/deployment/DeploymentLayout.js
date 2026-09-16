@@ -131,6 +131,10 @@ const DeploymentLayout = () => {
     setSearchParams({ division: id });
   };
 
+  const divisionsNeedingAttention = divisions.filter(
+    (division) => (pendingByDivision[division._id] || 0) + (postByDivision[division._id] || 0) > 0
+  );
+
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -155,6 +159,36 @@ const DeploymentLayout = () => {
           </select>
         )}
       </div>
+
+      {divisionsNeedingAttention.length > 0 && (
+        <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3" aria-label="Division alerts">
+          <p className="text-sm font-semibold text-amber-900">Needs attention by division</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {divisionsNeedingAttention.map((division) => {
+              const requestCount = pendingByDivision[division._id] || 0;
+              const divisionPostCount = postByDivision[division._id] || 0;
+              const details = [
+                requestCount ? `${requestCount} request${requestCount === 1 ? "" : "s"}` : "",
+                divisionPostCount ? `${divisionPostCount} post alert${divisionPostCount === 1 ? "" : "s"}` : "",
+              ].filter(Boolean).join(", ");
+              return (
+                <button
+                  key={division._id}
+                  type="button"
+                  onClick={() => handleSelectDivision(division._id)}
+                  className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                    selectedDivisionId === division._id
+                      ? "border-amber-500 bg-amber-200 text-amber-950"
+                      : "border-amber-300 bg-white text-amber-800 hover:border-amber-500 hover:bg-amber-100"
+                  }`}
+                >
+                  {division.name}: {details}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="mb-6 flex gap-6 overflow-x-auto border-b border-slate-200">
         {TABS.map((tab) => (

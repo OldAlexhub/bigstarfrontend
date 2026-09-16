@@ -9,6 +9,7 @@ import {
   formatRequestPerson,
   REALLOCATION_UPDATED_EVENT,
   ReallocationAuditTrail,
+  requestDivisionLabel,
   requestRouteLabel,
   statusClasses,
   statusLabel,
@@ -64,7 +65,7 @@ const ReceivingRequests = () => {
       <table className="min-w-full divide-y divide-slate-200 text-sm">
         <thead className="bg-slate-50">
           <tr>
-            {['Requested', 'Route', 'Assignment change', 'Effective date', 'Requested by', 'Status'].map((heading) => (
+            {['Requested', 'Division', 'Route', 'Assignment change', 'Effective date', 'Requested by', 'Status'].map((heading) => (
               <th key={heading} className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-500">{heading}</th>
             ))}
             {pendingTable && <th className="px-3 py-2 text-right font-medium text-slate-500">Action</th>}
@@ -72,11 +73,16 @@ const ReceivingRequests = () => {
         </thead>
         <tbody className="divide-y divide-slate-100">
           {rows.length === 0 && (
-            <tr><td colSpan={pendingTable ? 7 : 6} className="px-3 py-6 text-center text-slate-400">{pendingTable ? "No requests waiting for approval." : "No accepted requests yet."}</td></tr>
+            <tr><td colSpan={pendingTable ? 8 : 7} className="px-3 py-6 text-center text-slate-400">{pendingTable ? "No requests waiting for approval." : "No accepted requests yet."}</td></tr>
           )}
           {rows.map((request) => (
             <tr key={request._id}>
               <td className="whitespace-nowrap px-3 py-3 text-slate-600">{formatDateTime(request.createdAt)}</td>
+              <td className="whitespace-nowrap px-3 py-3">
+                <span className="rounded-full bg-violet-100 px-2 py-1 text-xs font-semibold text-violet-700">
+                  {request.division ? requestDivisionLabel(request) : selectedDivision.name}
+                </span>
+              </td>
               <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-900">{requestRouteLabel(request)}</td>
               <td className="min-w-80 px-3 py-3 text-slate-600">
                 <div className="text-xs text-slate-400">{assignmentSummary(request, "original")}</div>
