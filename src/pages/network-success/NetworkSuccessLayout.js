@@ -5,19 +5,25 @@ import { REALLOCATION_UPDATED_EVENT } from "../reallocationUi";
 import { TEAM_POST_UPDATED_EVENT } from "../posts/postUi";
 import { playNotificationSound } from "../../utils/notificationSound";
 import { clearTabNotificationCount, setTabNotificationCount } from "../../utils/tabNotifications";
+import { useAuth } from "../../context/AuthContext";
+import { canAccessPage } from "../../config/pageAccess";
 
 const NetworkSuccessLayout = () => {
+  const { user } = useAuth();
   const [acceptedCount, setAcceptedCount] = useState(0);
   const [postCount, setPostCount] = useState(0);
   const acceptedCountRef = useRef(null);
+  const acceptedRequestSequenceRef = useRef(0);
   const postCountRef = useRef(null);
 
   useEffect(() => {
+    if (!canAccessPage(user, "network_success.reallocation_requests")) return undefined;
     let cancelled = false;
     const loadNotifications = () => {
+      const requestSequence = ++acceptedRequestSequenceRef.current;
       apiGet("/api/reallocation-requests/notifications")
         .then((data) => {
-          if (cancelled) return;
+          if (cancelled || requestSequence !== acceptedRequestSequenceRef.current) return;
           const nextCount = data.count || 0;
           if (acceptedCountRef.current !== null && nextCount > acceptedCountRef.current) {
             playNotificationSound();
@@ -34,14 +40,16 @@ const NetworkSuccessLayout = () => {
     window.addEventListener(REALLOCATION_UPDATED_EVENT, loadNotifications);
     return () => {
       cancelled = true;
+      acceptedRequestSequenceRef.current += 1;
       window.clearInterval(interval);
       window.removeEventListener("focus", loadNotifications);
       window.removeEventListener(REALLOCATION_UPDATED_EVENT, loadNotifications);
       clearTabNotificationCount("network-accepted");
     };
-  }, []);
+  }, [user]);
 
   useEffect(() => {
+    if (!canAccessPage(user, "network_success.posts")) return undefined;
     let cancelled = false;
     const loadNotifications = () => {
       apiGet("/api/team-posts/notifications?section=network_success")
@@ -68,7 +76,7 @@ const NetworkSuccessLayout = () => {
       window.removeEventListener(TEAM_POST_UPDATED_EVENT, loadNotifications);
       clearTabNotificationCount("network-posts");
     };
-  }, []);
+  }, [user]);
 
   return (
     <div>
@@ -80,7 +88,7 @@ const NetworkSuccessLayout = () => {
       </p>
     </div>
     <div className="mb-7 flex gap-6 overflow-x-auto border-b border-slate-200">
-      <NavLink
+      {canAccessPage(user, "network_success.excel_submissions") && <NavLink
         to="/network-success"
         end
         className={({ isActive }) =>
@@ -90,8 +98,8 @@ const NetworkSuccessLayout = () => {
         }
       >
         Excel Submissions
-      </NavLink>
-      <NavLink
+      </NavLink>}
+      {canAccessPage(user, "network_success.performance") && <NavLink
         to="/network-success/performance"
         className={({ isActive }) =>
           `inline-flex border-b-2 px-1 py-3 text-sm font-medium ${
@@ -100,8 +108,8 @@ const NetworkSuccessLayout = () => {
         }
       >
         Performance
-      </NavLink>
-      <NavLink
+      </NavLink>}
+      {canAccessPage(user, "network_success.reallocation_requests") && <NavLink
         to="/network-success/reallocation-requests"
         className={({ isActive }) =>
           `inline-flex shrink-0 border-b-2 px-1 py-3 text-sm font-medium ${
@@ -115,8 +123,8 @@ const NetworkSuccessLayout = () => {
             {acceptedCount > 99 ? "99+" : acceptedCount}
           </span>
         )}
-      </NavLink>
-      <NavLink
+      </NavLink>}
+      {canAccessPage(user, "network_success.posts") && <NavLink
         to="/network-success/posts"
         className={({ isActive }) =>
           `inline-flex shrink-0 border-b-2 px-1 py-3 text-sm font-medium ${
@@ -130,8 +138,8 @@ const NetworkSuccessLayout = () => {
             {postCount > 99 ? "99+" : postCount}
           </span>
         )}
-      </NavLink>
-      <NavLink
+      </NavLink>}
+      {canAccessPage(user, "network_success.email_templates") && <NavLink
         to="/network-success/email-templates"
         className={({ isActive }) =>
           `inline-flex shrink-0 border-b-2 px-1 py-3 text-sm font-medium ${
@@ -140,8 +148,8 @@ const NetworkSuccessLayout = () => {
         }
       >
         Email Templates
-      </NavLink>
-      <NavLink
+      </NavLink>}
+      {canAccessPage(user, "network_success.ld_helper") && <NavLink
         to="/network-success/ld-helper"
         className={({ isActive }) =>
           `inline-flex shrink-0 border-b-2 px-1 py-3 text-sm font-medium ${
@@ -150,7 +158,7 @@ const NetworkSuccessLayout = () => {
         }
       >
         LD Helper
-      </NavLink>
+      </NavLink>}
     </div>
     <Outlet />
     </div>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useOutletContext } from "react-router-dom";
-import { apiGet } from "../../api/client";
+import { apiDownload, apiGet } from "../../api/client";
 import { toISODate, todayInTimezone, addDays } from "../../utils/dates";
 import { useLatestRequest } from "../../hooks/useLatestRequest";
 
@@ -27,6 +27,7 @@ const ActivityLog = () => {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [downloading, setDownloading] = useState("");
   const { begin, isCurrent } = useLatestRequest();
 
   useEffect(() => {
@@ -57,6 +58,29 @@ const ActivityLog = () => {
     setPage(1);
   }, [selectedDivision, from, to, search]);
 
+  const downloadLog = async (format) => {
+    if (!selectedDivision || !from || !to) return;
+    setDownloading(format);
+    setError("");
+    try {
+      const { blob, filename } = await apiDownload(
+        `/api/deployment-activity/export?division=${encodeURIComponent(selectedDivision._id)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&format=${format}`
+      );
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDownloading("");
+    }
+  };
+
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
@@ -79,6 +103,24 @@ const ActivityLog = () => {
               className="mt-1 block rounded-md border border-slate-300 px-2 py-1.5 text-sm"
             />
           </label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => downloadLog("xlsx")}
+              disabled={Boolean(downloading) || !from || !to}
+              className="rounded-md bg-brand-500 px-3 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
+            >
+              {downloading === "xlsx" ? "Downloading…" : "Download Excel"}
+            </button>
+            <button
+              type="button"
+              onClick={() => downloadLog("csv")}
+              disabled={Boolean(downloading) || !from || !to}
+              className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              {downloading === "csv" ? "Downloading…" : "Download CSV"}
+            </button>
+          </div>
         </div>
         <label className="text-sm text-slate-600">
           Search

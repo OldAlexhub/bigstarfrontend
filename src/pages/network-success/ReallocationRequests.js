@@ -6,6 +6,7 @@ import {
   formatDateTime,
   formatEffectiveDate,
   formatRequestPerson,
+  REALLOCATION_UPDATED_EVENT,
   ReallocationAuditTrail,
   requestDivisionLabel,
   requestRouteLabel,
@@ -37,13 +38,20 @@ const ReallocationRequests = () => {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([apiGet("/api/divisions"), apiGet("/api/operators")])
-      .then(([divisionData, operatorData]) => {
+    Promise.all([
+      apiGet("/api/divisions"),
+      apiGet("/api/reallocation-requests/notifications").catch(() => ({ byDivision: {} })),
+    ])
+      .then(([divisionData, notificationData]) => {
         if (cancelled) return;
         const availableDivisions = divisionData.divisions || [];
         setDivisions(availableDivisions);
-        setOperators(operatorData.operators || []);
-        if (availableDivisions.length) setDivisionId(availableDivisions[0]._id);
+        if (availableDivisions.length) {
+          const divisionWithUpdate = availableDivisions.find(
+            (division) => (notificationData.byDivision?.[division._id] || 0) > 0
+          );
+          setDivisionId((divisionWithUpdate || availableDivisions[0])._id);
+        }
       })
       .catch((err) => {
         if (!cancelled) setError(err.message);
@@ -62,15 +70,28 @@ const ReallocationRequests = () => {
     setError("");
     Promise.all([
       apiGet(`/api/run-cuts?division=${divisionId}`),
-      apiGet(`/api/vehicles?division=${divisionId}`),
+      apiGet(`/api/operators?division=${divisionId}&active=1`),
+      apiGet(`/api/vehicles?division=${divisionId}&active=1`),
       apiGet(`/api/reallocation-requests?division=${divisionId}`),
     ])
-      .then(([runCutData, vehicleData, requestData]) => {
+      .then(async ([runCutData, operatorData, vehicleData, requestData]) => {
         if (cancelled) return;
+        const nextRequests = requestData.requests || [];
         setRunCuts(runCutData.runCuts || []);
+        setOperators(operatorData.operators || []);
         setVehicles(vehicleData.vehicles || []);
-        setRequests(requestData.requests || []);
+        setRequests(nextRequests);
         setForm(emptyForm(selectedDivision?.timezone));
+
+        if (nextRequests.some((request) => request.networkUnread)) {
+          await apiPost("/api/reallocation-requests/acknowledge", { division: divisionId });
+          if (!cancelled) {
+            setRequests((current) => current.map((request) => (
+              request.networkUnread ? { ...request, networkUnread: false } : request
+            )));
+          }
+          window.dispatchEvent(new Event(REALLOCATION_UPDATED_EVENT));
+        }
       })
       .catch((err) => {
         if (!cancelled) setError(err.message);
@@ -84,12 +105,12 @@ const ReallocationRequests = () => {
   }, [divisionId, selectedDivision?.timezone]);
 
   const divisionOperators = useMemo(
-    () =>
-      operators.filter((operator) => {
-        const operatorDivision = operator.division?._id || operator.division;
-        return String(operatorDivision) === String(divisionId) && operator.active !== false;
-      }),
+    () => operators.filter((operator) => operator.active !== false),
     [divisionId, operators]
+  );
+  const divisionVehicles = useMemo(
+    () => vehicles.filter((vehicle) => vehicle.active !== false),
+    [vehicles]
   );
   const selectedRunCut = runCuts.find((runCut) => runCut._id === form.runCut);
   const selectedDestination = runCuts.find((runCut) => runCut._id === form.destinationRunCut);
@@ -124,14 +145,20 @@ const ReallocationRequests = () => {
 
   const setOperator = (operatorName) => {
     const matched = divisionOperators.find(
-      (operator) => operator.name.toLowerCase() === operatorName.trim().toLowerCase()
+      (operator) => operator.name === operatorName
     );
     setForm((current) => ({
       ...current,
       destinationRunCut: "",
-      operatorName,
-      vehicleCode: operatorName ? current.vehicleCode || selectedRunCut?.vehicle?.code || "" : "",
-      pulloutAddress: operatorName ? matched?.pulloutAddress || current.pulloutAddress : "",
+      operatorName: matched?.name || "",
+      vehicleCode: matched
+        ? current.vehicleCode || (
+            divisionVehicles.some((vehicle) => vehicle.code === selectedRunCut?.vehicle?.code)
+              ? selectedRunCut.vehicle.code
+              : ""
+          )
+        : "",
+      pulloutAddress: matched?.pulloutAddress || "",
     }));
   };
 
@@ -243,17 +270,17 @@ const ReallocationRequests = () => {
 
           <label className="text-sm text-slate-600">
             New operator (leave blank to unassign)
-            <input
+            <select
               aria-label="New operator (leave blank to unassign)"
-              list="reallocation-operators"
               value={form.operatorName}
               onChange={(event) => setOperator(event.target.value)}
               disabled={!selectedRunCut || Boolean(form.destinationRunCut)}
-              className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100"
-            />
-            <datalist id="reallocation-operators">
-              {divisionOperators.map((operator) => <option key={operator._id} value={operator.name} />)}
-            </datalist>
+              className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm disabled:bg-slate-100"
+            >
+              <option value="">Unassign current operator</option>
+              {divisionOperators.map((operator) => <option key={operator._id} value={operator.name}>{operator.name}</option>)}
+            </select>
+            <span className="mt-1 block text-xs text-slate-400">Active drivers from this division's Master Run Cuts roster.</span>
           </label>
 
           <label className="text-sm text-slate-600">
@@ -266,7 +293,7 @@ const ReallocationRequests = () => {
               className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm disabled:bg-slate-100"
             >
               <option value="">No vehicle</option>
-              {vehicles.filter((vehicle) => vehicle.active !== false).map((vehicle) => (
+              {divisionVehicles.map((vehicle) => (
                 <option key={vehicle._id} value={vehicle.code}>{vehicle.code}</option>
               ))}
             </select>
@@ -277,10 +304,11 @@ const ReallocationRequests = () => {
             <input
               aria-label="Pullout address"
               value={form.pulloutAddress}
-              onChange={(event) => setForm((current) => ({ ...current, pulloutAddress: event.target.value }))}
+              readOnly
               disabled={!assignmentFieldsEnabled}
-              className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100"
+              className="mt-1 block w-full rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm disabled:bg-slate-100"
             />
+            <span className="mt-1 block text-xs text-slate-400">Automatically supplied by the selected driver's roster record.</span>
           </label>
         </div>
 

@@ -1,10 +1,12 @@
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { apiGet } from "../api/client";
 import DeploymentLayout from "./deployment/DeploymentLayout";
 import NetworkSuccessLayout from "./network-success/NetworkSuccessLayout";
+import { REALLOCATION_UPDATED_EVENT } from "./reallocationUi";
 
 vi.mock("../api/client", () => ({ apiGet: vi.fn() }));
+vi.mock("../context/AuthContext", () => ({ useAuth: () => ({ user: { role: "ELT" } }) }));
 
 describe("reallocation notification badges", () => {
   beforeEach(() => {
@@ -46,6 +48,36 @@ describe("reallocation notification badges", () => {
     );
 
     expect(await screen.findByLabelText("2 accepted requests")).toBeInTheDocument();
+  });
+
+  test("an older notification response cannot restore a badge after acknowledgement", async () => {
+    const pendingNotificationRequests = [];
+    apiGet.mockImplementation((path) => {
+      if (path === "/api/reallocation-requests/notifications") {
+        return new Promise((resolve) => pendingNotificationRequests.push(resolve));
+      }
+      if (path === "/api/team-posts/notifications?section=network_success") {
+        return Promise.resolve({ count: 0, byDivision: {} });
+      }
+      return Promise.reject(new Error(`Unexpected request: ${path}`));
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/network-success"]}>
+        <Routes>
+          <Route path="/network-success" element={<NetworkSuccessLayout />}><Route index element={<div />} /></Route>
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => expect(pendingNotificationRequests).toHaveLength(1));
+    fireEvent(window, new Event(REALLOCATION_UPDATED_EVENT));
+    await waitFor(() => expect(pendingNotificationRequests).toHaveLength(2));
+
+    await act(async () => pendingNotificationRequests[1]({ count: 0, byDivision: {} }));
+    await act(async () => pendingNotificationRequests[0]({ count: 2, byDivision: { "division-1": 2 } }));
+
+    expect(screen.queryByLabelText("2 accepted requests")).not.toBeInTheDocument();
   });
 
   test("Deployment shows unread post and response notifications", async () => {

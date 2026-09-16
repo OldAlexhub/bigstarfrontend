@@ -40,7 +40,9 @@ const OperationsKpiSettings = ({ divisions }) => {
 
   useEffect(() => { load(); }, []);
   useEffect(() => {
-    if (!divisionId && divisions[0]) setDivisionId(divisions[0]._id);
+    if (!divisions.some((division) => division._id === divisionId)) {
+      setDivisionId(divisions[0]?._id || "");
+    }
   }, [divisionId, divisions]);
   useEffect(() => {
     if (!divisionId || !definitions.length) return;
@@ -116,9 +118,11 @@ const SettingsPage = () => {
   const [divisions, setDivisions] = useState([]);
   const [error, setError] = useState("");
   const [savedMessage, setSavedMessage] = useState("");
+  const [lifecycleBusyId, setLifecycleBusyId] = useState("");
 
   const load = () => {
-    Promise.all([apiGet("/api/settings"), apiGet("/api/divisions")])
+    const divisionsPath = isELT ? "/api/divisions?includeInactive=1" : "/api/divisions";
+    Promise.all([apiGet("/api/settings"), apiGet(divisionsPath)])
       .then(([settingsData, divisionsData]) => {
         setSettings(settingsData.settings);
         setDivisions(divisionsData.divisions);
@@ -182,6 +186,37 @@ const SettingsPage = () => {
       setError(err.message);
     }
   };
+
+  const handleDivisionLifecycleChange = async (division) => {
+    const restoring = division.active === false;
+    if (!restoring) {
+      const confirmed = window.confirm(
+        `Retire ${division.name || division.code}? It will disappear from every operational area, but all historical data will be preserved.`
+      );
+      if (!confirmed) return;
+    }
+
+    setLifecycleBusyId(division._id);
+    setError("");
+    try {
+      const data = await apiPatch(`/api/divisions/${division._id}`, { active: restoring });
+      setDivisions((current) =>
+        current.map((item) => (item._id === division._id ? data.division : item))
+      );
+      setSavedMessage(restoring ? "Division restored" : "Division retired; historical data was preserved");
+      setTimeout(() => setSavedMessage(""), 2500);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLifecycleBusyId("");
+    }
+  };
+
+  const activeDivisions = divisions.filter((division) => division.active !== false);
+  const displayedDivisions = [...divisions].sort((a, b) => {
+    if ((a.active !== false) !== (b.active !== false)) return a.active === false ? 1 : -1;
+    return String(a.code).localeCompare(String(b.code), undefined, { numeric: true });
+  });
 
   if (!settings) {
     return error ? (
@@ -270,8 +305,10 @@ const SettingsPage = () => {
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-6">
-        <h2 className="mb-4 text-sm font-semibold text-slate-900">Per-division overrides</h2>
-        <p className="mb-4 text-xs text-slate-400">Leave blank to fall back to the company-wide default.</p>
+        <h2 className="mb-2 text-sm font-semibold text-slate-900">Division settings and lifecycle</h2>
+        <p className="mb-4 text-xs text-slate-400">
+          Leave overrides blank to use company defaults. Retiring a division hides it throughout the site and stops future automated processing without deleting its history.
+        </p>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead>
@@ -280,16 +317,21 @@ const SettingsPage = () => {
                 <th className="px-3 py-2 text-left font-medium text-slate-500">Break minutes</th>
                 <th className="px-3 py-2 text-left font-medium text-slate-500">Revenue ratio</th>
                 <th className="px-3 py-2 text-left font-medium text-slate-500">Timezone</th>
+                <th className="px-3 py-2 text-left font-medium text-slate-500">Status</th>
                 <th className="px-3 py-2" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {divisions.map((d) => (
-                <tr key={d._id}>
-                  <td className="px-3 py-2 font-medium text-slate-900">{d.code}</td>
+              {displayedDivisions.map((d) => (
+                <tr key={d._id} className={d.active === false ? "bg-slate-50 opacity-75" : ""}>
+                  <td className="px-3 py-2 font-medium text-slate-900">
+                    {d.code}
+                    <span className="ml-2 text-xs font-normal text-slate-400">{d.name}</span>
+                  </td>
                   <td className="px-3 py-2">
                     <input
                       type="number"
+                      disabled={d.active === false}
                       value={d.thresholds?.breakMinutes ?? ""}
                       onChange={(e) => handleDivisionThresholdChange(d._id, "breakMinutes", e.target.value)}
                       className={inputClasses}
@@ -299,6 +341,7 @@ const SettingsPage = () => {
                     <input
                       type="number"
                       step="0.01"
+                      disabled={d.active === false}
                       value={d.thresholds?.revenueRatio ?? ""}
                       onChange={(e) => handleDivisionThresholdChange(d._id, "revenueRatio", e.target.value)}
                       className={inputClasses}
@@ -307,7 +350,7 @@ const SettingsPage = () => {
                   <td className="px-3 py-2">
                     <select
                       value={d.timezone || TIMEZONES[0]}
-                      disabled={!isELT}
+                      disabled={!isELT || d.active === false}
                       onChange={(e) => handleDivisionTimezoneChange(d._id, e.target.value)}
                       className="rounded-md border border-slate-300 px-2 py-1.5 text-sm disabled:bg-slate-100"
                     >
@@ -319,12 +362,35 @@ const SettingsPage = () => {
                     </select>
                   </td>
                   <td className="px-3 py-2">
-                    <button
-                      onClick={() => handleDivisionSave(d)}
-                      className="text-xs font-medium text-brand-600 hover:underline"
-                    >
-                      Save
-                    </button>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                      d.active === false ? "bg-slate-200 text-slate-600" : "bg-emerald-50 text-emerald-700"
+                    }`}>
+                      {d.active === false ? "Retired" : "Active"}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2">
+                    <div className="flex items-center gap-3 whitespace-nowrap">
+                      <button
+                        type="button"
+                        onClick={() => handleDivisionSave(d)}
+                        disabled={d.active === false}
+                        className="text-xs font-medium text-brand-600 hover:underline disabled:text-slate-300 disabled:no-underline"
+                      >
+                        Save
+                      </button>
+                      {isELT && (
+                        <button
+                          type="button"
+                          onClick={() => handleDivisionLifecycleChange(d)}
+                          disabled={lifecycleBusyId === d._id}
+                          className={`text-xs font-medium hover:underline disabled:opacity-50 ${
+                            d.active === false ? "text-emerald-600" : "text-amber-700"
+                          }`}
+                        >
+                          {lifecycleBusyId === d._id ? "Saving…" : d.active === false ? "Restore" : "Retire"}
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -333,7 +399,7 @@ const SettingsPage = () => {
         </div>
       </div>
 
-      {isELT && <OperationsKpiSettings divisions={divisions} />}
+      {isELT && <OperationsKpiSettings divisions={activeDivisions} />}
     </div>
   );
 };

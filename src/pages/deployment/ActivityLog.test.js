@@ -1,6 +1,6 @@
 import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { apiGet } from "../../api/client";
+import { apiDownload, apiGet } from "../../api/client";
 import ActivityLog, { TRACKER_LOG_PAGE_SIZE } from "./ActivityLog";
 
 vi.mock("react-router-dom", () => {
@@ -14,7 +14,7 @@ vi.mock("react-router-dom", () => {
   };
 });
 
-vi.mock("../../api/client", () => ({ apiGet: vi.fn() }));
+vi.mock("../../api/client", () => ({ apiDownload: vi.fn(), apiGet: vi.fn() }));
 
 const entries = Array.from({ length: 32 }, (_, index) => ({
   _id: `entry-${index + 1}`,
@@ -47,4 +47,26 @@ test("Tracker Log shows 15 records per numbered page and resets pagination for s
   });
   expect(screen.getByText("Tracker action 32")).toBeInTheDocument();
   expect(screen.queryByRole("navigation", { name: "Tracker Log pages" })).not.toBeInTheDocument();
+});
+
+test("Tracker Log downloads all data for the selected dates as CSV", async () => {
+  apiGet.mockResolvedValue({ entries: [] });
+  apiDownload.mockResolvedValue({ blob: new Blob(["data"]), filename: "tracker.csv" });
+  const createObjectURL = vi.spyOn(window.URL, "createObjectURL").mockReturnValue("blob:tracker");
+  const revokeObjectURL = vi.spyOn(window.URL, "revokeObjectURL").mockImplementation(() => {});
+  const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+  render(<ActivityLog />);
+  fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-09-01" } });
+  fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-09-15" } });
+  fireEvent.click(screen.getByRole("button", { name: "Download CSV" }));
+
+  expect(apiDownload).toHaveBeenCalledWith(
+    "/api/deployment-activity/export?division=division-1&from=2026-09-01&to=2026-09-15&format=csv"
+  );
+  expect(await screen.findByRole("button", { name: "Download CSV" })).toBeEnabled();
+
+  createObjectURL.mockRestore();
+  revokeObjectURL.mockRestore();
+  click.mockRestore();
 });

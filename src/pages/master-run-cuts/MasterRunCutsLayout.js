@@ -2,13 +2,14 @@ import { useEffect, useState } from "react";
 import { NavLink, Outlet, useSearchParams } from "react-router-dom";
 import { apiGet, apiPost } from "../../api/client";
 import { useAuth } from "../../context/AuthContext";
+import { canAccessPage } from "../../config/pageAccess";
 import { TIMEZONES, DEFAULT_TIMEZONE } from "../../utils/dates";
 
 const TABS = [
-  { to: "/master-run-cuts", label: "Run Cuts", end: true },
-  { to: "/master-run-cuts/drivers", label: "Drivers", end: false },
-  { to: "/master-run-cuts/vehicles", label: "Vehicles", end: false },
-  { to: "/master-run-cuts/tracker", label: "Tracker", end: false },
+  { to: "/master-run-cuts", label: "Run Cuts", end: true, permission: "master_run_cuts.run_cuts" },
+  { to: "/master-run-cuts/drivers", label: "Drivers", end: false, permission: "master_run_cuts.drivers" },
+  { to: "/master-run-cuts/vehicles", label: "Vehicles", end: false, permission: "master_run_cuts.vehicles" },
+  { to: "/master-run-cuts/tracker", label: "Tracker", end: false, permission: "master_run_cuts.tracker" },
 ];
 
 const tabClasses = ({ isActive }) =>
@@ -167,7 +168,7 @@ const MasterRunCutsLayout = () => {
       )}
 
       <div className="mb-6 flex gap-6 overflow-x-auto border-b border-slate-200">
-        {TABS.map((tab) => (
+        {TABS.filter((tab) => canAccessPage(user, tab.permission)).map((tab) => (
           <NavLink key={tab.to} to={tab.to} end={tab.end} className={tabClasses}>
             {tab.label}
           </NavLink>

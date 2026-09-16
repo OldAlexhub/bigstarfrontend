@@ -58,3 +58,19 @@ test("a user with only safety access sees a single Performance group and no sche
   expect(within(panel).getByRole("link", { name: "Safety" })).toBeInTheDocument();
   expect(within(panel).queryByRole("link", { name: "Customer Service" })).not.toBeInTheDocument();
 });
+
+test("granular access links a section to the first assigned tab and hides unassigned sections", () => {
+  mockUser = {
+    name: "Client Reporting User",
+    role: "Coordinator",
+    sections: ["deployment"],
+    pageAccessConfigured: true,
+    pageAccess: ["deployment.client_report"],
+  };
+  render(<Navbar />);
+
+  expect(screen.getByRole("link", { name: "Deployment" })).toHaveAttribute("href", "/deployment/client-report");
+  expect(screen.queryByRole("link", { name: "Dashboard" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: "Settings" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: "Master Run Cuts" })).not.toBeInTheDocument();
+});

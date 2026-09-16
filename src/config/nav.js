@@ -1,12 +1,14 @@
+import { canAccessPage, canAccessSection, firstAccessiblePathForSection, PAGE_ACCESS_PAGES } from "./pageAccess";
+
 export const NAV_ITEMS = [
-  { key: "master_run_cuts", label: "Master Run Cuts", path: "/master-run-cuts" },
-  { key: "deployment", label: "Deployment", path: "/deployment" },
-  { key: "network_success", label: "Network Success", path: "/network-success" },
-  { key: "customer_service", label: "Customer Service", path: "/customer-service" },
-  { key: "safety", label: "Safety", path: "/safety" },
-  { key: "operations_reporting", label: "Operations Reporting", path: "/operations-reporting" },
-  { key: "elt_reporting", label: "ELT Reporting", path: "/elt-reporting" },
-  { key: "leaderboard", label: "Leaderboard", path: "/leaderboard" },
+  { key: "master_run_cuts", label: "Master Run Cuts" },
+  { key: "deployment", label: "Deployment" },
+  { key: "network_success", label: "Network Success" },
+  { key: "customer_service", label: "Customer Service" },
+  { key: "safety", label: "Safety" },
+  { key: "operations_reporting", label: "Operations Reporting" },
+  { key: "elt_reporting", label: "ELT Reporting", pageKey: "elt_reporting.operations_report" },
+  { key: "leaderboard", label: "Leaderboard", pageKey: "leaderboard" },
 ];
 
 // Kept as direct top-level navbar links (not grouped into a dropdown). Dashboard.js
@@ -19,5 +21,15 @@ export const NAV_GROUPS = [
   { key: "reporting", label: "Reporting", itemKeys: ["elt_reporting", "leaderboard"] },
 ];
 
-export const canAccess = (user, key) =>
-  Boolean(user) && (user.role === "ELT" || user.sections?.includes(key));
+export const canAccess = (user, key) => {
+  const item = NAV_ITEMS.find((candidate) => candidate.key === key);
+  return item?.pageKey ? canAccessPage(user, item.pageKey) : canAccessSection(user, key);
+};
+
+export const accessibleNavItem = (user, item) => {
+  if (!canAccess(user, item.key)) return null;
+  const path = item.pageKey
+    ? PAGE_ACCESS_PAGES.find((page) => page.key === item.pageKey)?.path
+    : firstAccessiblePathForSection(user, item.key);
+  return path ? { ...item, path } : null;
+};

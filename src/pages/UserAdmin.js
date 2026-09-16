@@ -2,17 +2,9 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiGet, apiPost, apiPatch, apiDelete } from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import { effectivePageAccess, PAGE_ACCESS_GROUPS, PAGE_ACCESS_KEYS } from "../config/pageAccess";
 
 const ROLES = ["ELT", "VP", "Director", "Sr Manager", "Manager", "Coordinator"];
-const SECTIONS = [
-  { key: "master_run_cuts", label: "Master Run Cuts" },
-  { key: "deployment", label: "Deployment" },
-  { key: "network_success", label: "Network Success" },
-  { key: "customer_service", label: "Customer Service" },
-  { key: "safety", label: "Safety" },
-  { key: "operations_reporting", label: "Operations Reporting" },
-];
-
 const emptyForm = {
   username: "",
   password: "",
@@ -22,7 +14,7 @@ const emptyForm = {
   title: "",
   department: "",
   role: "Coordinator",
-  sections: [],
+  pageAccess: [],
   divisionAccess: [],
 };
 
@@ -30,10 +22,19 @@ const inputClasses =
   "mt-1 block w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500";
 
 const UserForm = ({ form, setForm, divisions, isEdit, onSubmit, onCancel, submitting, error }) => {
-  const toggleSection = (key) => {
+  const togglePage = (key) => {
     setForm((f) => ({
       ...f,
-      sections: f.sections.includes(key) ? f.sections.filter((s) => s !== key) : [...f.sections, key],
+      pageAccess: f.pageAccess.includes(key) ? f.pageAccess.filter((page) => page !== key) : [...f.pageAccess, key],
+    }));
+  };
+  const setGroupAccess = (pages, enabled) => {
+    const keys = pages.map((page) => page.key);
+    setForm((f) => ({
+      ...f,
+      pageAccess: enabled
+        ? [...new Set([...f.pageAccess, ...keys])]
+        : f.pageAccess.filter((page) => !keys.includes(page)),
     }));
   };
   const toggleDivision = (id) => {
@@ -110,38 +111,61 @@ const UserForm = ({ form, setForm, divisions, isEdit, onSubmit, onCancel, submit
         </label>
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-6">
-        <div className="text-sm text-slate-600">
-          Sections
-          <div className="mt-1 flex flex-wrap gap-3">
-            {SECTIONS.map((s) => (
-              <label key={s.key} className="flex items-center gap-1.5">
-                <input type="checkbox" checked={form.sections.includes(s.key)} onChange={() => toggleSection(s.key)} />
-                {s.label}
-              </label>
-            ))}
+      <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-800">Site and tab access</h3>
+            <p className="mt-0.5 text-xs text-slate-500">Choose each page this user can open. Unchecked pages stay hidden and are blocked by direct URL.</p>
+          </div>
+          <div className="flex gap-2">
+            <button type="button" disabled={form.role === "ELT"} onClick={() => setForm((f) => ({ ...f, pageAccess: [...PAGE_ACCESS_KEYS] }))} className="text-xs font-medium text-brand-700 hover:underline disabled:text-slate-400">Select all</button>
+            <button type="button" disabled={form.role === "ELT"} onClick={() => setForm((f) => ({ ...f, pageAccess: [] }))} className="text-xs font-medium text-slate-600 hover:underline disabled:text-slate-400">Clear all</button>
           </div>
         </div>
-        <div className="text-sm text-slate-600">
-          Divisions
-          <div className="mt-1 flex max-w-lg flex-wrap gap-3">
-            {divisions.map((d) => (
-              <label key={d._id} className="flex items-center gap-1.5">
-                <input
-                  type="checkbox"
-                  checked={form.divisionAccess.includes(d._id)}
-                  onChange={() => toggleDivision(d._id)}
-                />
-                {d.code}
-              </label>
-            ))}
-          </div>
+        {form.role === "ELT" && <p className="mt-3 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-700">ELT automatically has access to every site page and division.</p>}
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {PAGE_ACCESS_GROUPS.map((group) => {
+            const allSelected = group.pages.every((page) => form.pageAccess.includes(page.key));
+            return (
+              <fieldset key={group.key} disabled={form.role === "ELT"} className="rounded-lg border border-slate-200 bg-white p-3 disabled:opacity-60">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <legend className="text-sm font-semibold text-slate-700">{group.label}</legend>
+                  <button type="button" onClick={() => setGroupAccess(group.pages, !allSelected)} className="text-[11px] font-medium text-brand-700 hover:underline">
+                    {allSelected ? "Clear group" : "Select group"}
+                  </button>
+                </div>
+                <div className="space-y-1.5">
+                  {group.pages.map((page) => (
+                    <label key={page.key} className="flex items-start gap-2 text-sm text-slate-600">
+                      <input type="checkbox" className="mt-0.5" checked={form.pageAccess.includes(page.key)} onChange={() => togglePage(page.key)} />
+                      {page.label}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            );
+          })}
         </div>
       </div>
 
-      <p className="mt-2 text-xs text-slate-400">
-        ELT ignores sections and divisions entirely — an ELT user already has access to everything.
-      </p>
+      <div className="mt-4 text-sm text-slate-600">
+        Divisions
+        <div className="mt-1 flex max-w-lg flex-wrap gap-3">
+          {divisions.map((d) => (
+            <label key={d._id} className="flex items-center gap-1.5">
+              <input
+                type="checkbox"
+                disabled={form.role === "ELT"}
+                checked={form.divisionAccess.includes(d._id)}
+                onChange={() => toggleDivision(d._id)}
+              />
+              {d.code}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <p className="mt-2 text-xs text-slate-400">Division choices control which division records are visible inside the assigned pages.</p>
 
       <div className="mt-4 flex gap-2">
         <button
@@ -221,7 +245,7 @@ const UserAdmin = () => {
       title: user.title || "",
       department: user.department || "",
       role: user.role,
-      sections: user.sections || [],
+      pageAccess: effectivePageAccess(user),
       divisionAccess: (user.divisionAccess || []).map((d) => d._id || d),
     });
     setEditError("");
@@ -278,7 +302,7 @@ const UserAdmin = () => {
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-slate-900">User Administration</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Add, edit, deactivate, or remove users, and control which sections and divisions they can access.
+          Add, edit, deactivate, or remove users, and control every site page, tab, and division they can access.
         </p>
         <p className="mt-2 text-sm">
           <Link to="/settings" className="text-brand-600 hover:underline">
@@ -319,7 +343,7 @@ const UserAdmin = () => {
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-50">
               <tr>
-                {["Name", "Username", "Email", "Role", "Title", "Department", "Sections", "Divisions", "Status", ""].map(
+                {["Name", "Username", "Email", "Role", "Title", "Department", "Pages", "Divisions", "Status", ""].map(
                   (h) => (
                     <th key={h} className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-500">
                       {h}
@@ -354,7 +378,7 @@ const UserAdmin = () => {
                     <td className="whitespace-nowrap px-3 py-2 text-slate-600">{u.title || "—"}</td>
                     <td className="whitespace-nowrap px-3 py-2 text-slate-600">{u.department || "—"}</td>
                     <td className="px-3 py-2 text-slate-600">
-                      {u.role === "ELT" ? "All" : u.sections?.length ? u.sections.join(", ") : "—"}
+                      {u.role === "ELT" ? "All" : `${effectivePageAccess(u).length} of ${PAGE_ACCESS_KEYS.length}`}
                     </td>
                     <td className="px-3 py-2 text-slate-600">
                       {u.role === "ELT" ? "All" : u.divisionAccess?.map((d) => d.code).join(", ") || "—"}

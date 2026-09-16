@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { NAV_ITEMS, canAccess } from "../config/nav";
+import { NAV_ITEMS, accessibleNavItem } from "../config/nav";
 import { apiGet } from "../api/client";
 
 const StatCard = ({ label, value, tone }) => (
@@ -50,7 +50,7 @@ const pct = (v) => `${Math.round((v || 0) * 1000) / 10}%`;
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const visibleItems = NAV_ITEMS.filter((item) => canAccess(user, item.key));
+  const visibleItems = NAV_ITEMS.map((item) => accessibleNavItem(user, item)).filter(Boolean);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
 

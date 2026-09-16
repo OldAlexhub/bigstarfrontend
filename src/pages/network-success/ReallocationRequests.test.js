@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { apiGet, apiPost } from "../../api/client";
+import { REALLOCATION_UPDATED_EVENT } from "../reallocationUi";
 import ReallocationRequests from "./ReallocationRequests";
 
 vi.mock("../../api/client", () => ({ apiGet: vi.fn(), apiPost: vi.fn() }));
@@ -45,7 +46,7 @@ describe("Network Success reallocation requests", () => {
     apiPost.mockReset();
     apiGet.mockImplementation((path) => {
       if (path === "/api/divisions") return Promise.resolve({ divisions: [{ _id: "division-1", name: "East", timezone: "America/New_York" }] });
-      if (path === "/api/operators") return Promise.resolve({
+      if (path.startsWith("/api/operators?division=division-1")) return Promise.resolve({
         operators: [{
           _id: "operator-2",
           name: "Taylor Driver",
@@ -117,11 +118,52 @@ describe("Network Success reallocation requests", () => {
 
     await screen.findByRole("option", { name: "101" });
     fireEvent.change(screen.getByLabelText("Current route number"), { target: { value: "run-cut-1" } });
+    expect(screen.getByRole("option", { name: "Taylor Driver" })).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: /New operator/ })).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText(/New operator/), { target: { value: "Taylor Driver" } });
 
     expect(screen.getByLabelText("Vehicle associated")).toBeEnabled();
     expect(screen.getByLabelText("Vehicle associated")).toHaveValue("V-12");
     expect(screen.getByLabelText("Pullout address")).toBeEnabled();
+    expect(screen.getByLabelText("Pullout address")).toHaveAttribute("readonly");
     expect(screen.getByLabelText("Pullout address")).toHaveValue("500 Depot Way");
+  });
+
+  test("acknowledges accepted updates after they are loaded for viewing", async () => {
+    const defaultGet = apiGet.getMockImplementation();
+    apiGet.mockImplementation((path) => {
+      if (path === "/api/reallocation-requests/notifications") {
+        return Promise.resolve({ count: 1, byDivision: { "division-1": 1 } });
+      }
+      if (path === "/api/reallocation-requests?division=division-1") {
+        return Promise.resolve({
+          requests: [{
+            _id: "accepted-request-1",
+            status: "approved",
+            routeCode: "101",
+            networkUnread: true,
+            createdAt: new Date().toISOString(),
+          }],
+        });
+      }
+      return defaultGet(path);
+    });
+    apiPost.mockImplementation((path) => {
+      if (path === "/api/reallocation-requests/acknowledge") {
+        return Promise.resolve({ acknowledged: 1 });
+      }
+      return Promise.resolve({ request: { _id: "request-1", status: "pending" } });
+    });
+    const updated = vi.fn();
+    window.addEventListener(REALLOCATION_UPDATED_EVENT, updated);
+
+    render(<ReallocationRequests />);
+
+    await waitFor(() => expect(apiPost).toHaveBeenCalledWith(
+      "/api/reallocation-requests/acknowledge",
+      { division: "division-1" }
+    ));
+    await waitFor(() => expect(updated).toHaveBeenCalledTimes(1));
+    window.removeEventListener(REALLOCATION_UPDATED_EVENT, updated);
   });
 });

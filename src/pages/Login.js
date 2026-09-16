@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import logo from "../assets/logo.png";
 import teamPortrait from "../assets/0azJCkAQ-scaled-portrait-3baef0d59dcee84ff955aa25eebf617a-yxz3f84okjwv.jpeg";
 import sloganBanner from "../assets/bigstar-linkedin-hero5.jpg";
+import { firstAccessiblePath } from "../config/pageAccess";
 
 const Login = () => {
   const { user, login } = useAuth();
@@ -14,11 +15,11 @@ const Login = () => {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const from = location.state?.from?.pathname || "/dashboard";
+  const requestedPath = location.state?.from?.pathname;
 
   useEffect(() => {
     if (user) {
-      navigate(from, { replace: true });
+      navigate(requestedPath || firstAccessiblePath(user), { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
@@ -28,8 +29,8 @@ const Login = () => {
     setError("");
     setSubmitting(true);
     try {
-      await login(username, password);
-      navigate(from, { replace: true });
+      const signedInUser = await login(username, password);
+      navigate(requestedPath || firstAccessiblePath(signedInUser), { replace: true });
     } catch (err) {
       setError(err.message);
     } finally {

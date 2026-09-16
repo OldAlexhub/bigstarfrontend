@@ -1,4 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
+import { canAccessPage } from "../../config/pageAccess";
 
 const tabClasses = ({ isActive }) =>
   `inline-flex border-b-2 px-1 py-3 text-sm font-medium ${
@@ -7,7 +9,9 @@ const tabClasses = ({ isActive }) =>
       : "border-transparent text-slate-500 hover:text-slate-700"
   }`;
 
-const CustomerServiceLayout = () => (
+const CustomerServiceLayout = () => {
+  const { user } = useAuth();
+  return (
   <div>
     <div className="mb-6">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-600">Customer experience</p>
@@ -17,15 +21,16 @@ const CustomerServiceLayout = () => (
       </p>
     </div>
     <div className="mb-7 flex gap-6 border-b border-slate-200">
-      <NavLink to="/customer-service" end className={tabClasses}>
+      {canAccessPage(user, "customer_service.monthly_counts") && <NavLink to="/customer-service" end className={tabClasses}>
         Monthly Counts
-      </NavLink>
-      <NavLink to="/customer-service/analytics" className={tabClasses}>
+      </NavLink>}
+      {canAccessPage(user, "customer_service.analytics") && <NavLink to="/customer-service/analytics" className={tabClasses}>
         Analytics
-      </NavLink>
+      </NavLink>}
     </div>
     <Outlet />
   </div>
-);
+  );
+};
 
 export default CustomerServiceLayout;

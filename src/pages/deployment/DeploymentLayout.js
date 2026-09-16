@@ -5,17 +5,19 @@ import { REALLOCATION_UPDATED_EVENT } from "../reallocationUi";
 import { TEAM_POST_UPDATED_EVENT } from "../posts/postUi";
 import { playNotificationSound } from "../../utils/notificationSound";
 import { clearTabNotificationCount, setTabNotificationCount } from "../../utils/tabNotifications";
+import { useAuth } from "../../context/AuthContext";
+import { canAccessPage } from "../../config/pageAccess";
 
 const TABS = [
-  { to: "/deployment", label: "Live Schedule", end: true },
-  { to: "/deployment/standby-utilization", label: "STBY Utilization", end: false },
-  { to: "/deployment/issue-log", label: "Issue Log", end: false },
-  { to: "/deployment/client-report", label: "Client Report", end: false },
-  { to: "/deployment/reporting", label: "Reporting", end: false },
-  { to: "/deployment/schedule-history", label: "Schedule History", end: false },
-  { to: "/deployment/receiving-requests", label: "Receiving Requests", end: false, requestNotifications: true },
-  { to: "/deployment/posts", label: "Posts", end: false, postNotifications: true },
-  { to: "/deployment/tracker-log", label: "Tracker Log", end: false },
+  { to: "/deployment", label: "Live Schedule", end: true, permission: "deployment.live_schedule" },
+  { to: "/deployment/standby-utilization", label: "STBY Utilization", end: false, permission: "deployment.standby_utilization" },
+  { to: "/deployment/issue-log", label: "Issue Log", end: false, permission: "deployment.issue_log" },
+  { to: "/deployment/client-report", label: "Client Report", end: false, permission: "deployment.client_report" },
+  { to: "/deployment/reporting", label: "Reporting", end: false, permission: "deployment.reporting" },
+  { to: "/deployment/schedule-history", label: "Schedule History", end: false, permission: "deployment.schedule_history" },
+  { to: "/deployment/receiving-requests", label: "Receiving Requests", end: false, requestNotifications: true, permission: "deployment.receiving_requests" },
+  { to: "/deployment/posts", label: "Posts", end: false, postNotifications: true, permission: "deployment.posts" },
+  { to: "/deployment/tracker-log", label: "Tracker Log", end: false, permission: "deployment.tracker_log" },
 ];
 
 const tabClasses = ({ isActive }) =>
@@ -26,6 +28,7 @@ const tabClasses = ({ isActive }) =>
   }`;
 
 const DeploymentLayout = () => {
+  const { user } = useAuth();
   const [divisions, setDivisions] = useState([]);
   const [selectedDivisionId, setSelectedDivisionId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -37,6 +40,7 @@ const DeploymentLayout = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
+    if (!canAccessPage(user, "deployment.posts")) return undefined;
     let cancelled = false;
     apiGet("/api/divisions")
       .then((data) => {
@@ -58,11 +62,12 @@ const DeploymentLayout = () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [user]);
 
   const postCountRef = useRef(null);
 
   useEffect(() => {
+    if (!canAccessPage(user, "deployment.receiving_requests")) return undefined;
     let cancelled = false;
     const loadPostCount = () => {
       apiGet("/api/team-posts/notifications?section=deployment")
@@ -90,7 +95,7 @@ const DeploymentLayout = () => {
       window.removeEventListener(TEAM_POST_UPDATED_EVENT, loadPostCount);
       clearTabNotificationCount("deployment-posts");
     };
-  }, []);
+  }, [user]);
 
   const selectedDivision = divisions.find((d) => d._id === selectedDivisionId) || null;
 
@@ -191,7 +196,7 @@ const DeploymentLayout = () => {
       )}
 
       <div className="mb-6 flex gap-6 overflow-x-auto border-b border-slate-200">
-        {TABS.map((tab) => (
+        {TABS.filter((tab) => canAccessPage(user, tab.permission)).map((tab) => (
           <NavLink key={tab.to} to={tab.to} end={tab.end} className={tabClasses}>
             {tab.label}
             {tab.requestNotifications && pendingRequestCount > 0 && (

@@ -42,6 +42,18 @@ import CapReporting from "./pages/operations-reporting/CapReporting";
 import ReceivingRequests from "./pages/deployment/ReceivingRequests";
 import DeploymentPosts from "./pages/deployment/Posts";
 import NetworkSuccessPosts from "./pages/network-success/Posts";
+import PageAccessRoute, { AccessDenied } from "./components/PageAccessRoute";
+import { useAuth } from "./context/AuthContext";
+import { firstAccessiblePath } from "./config/pageAccess";
+
+const HomeRedirect = () => {
+  const { user } = useAuth();
+  return <Navigate to={firstAccessiblePath(user)} replace />;
+};
+
+const allow = (permission, page) => (
+  <PageAccessRoute permission={permission}>{page}</PageAccessRoute>
+);
 
 function App() {
   return (
@@ -49,57 +61,59 @@ function App() {
       <Route path="/login" element={<Login />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<Layout />}>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/" element={<HomeRedirect />} />
+          <Route path="/dashboard" element={allow("dashboard", <Dashboard />)} />
           <Route path="/master-run-cuts" element={<MasterRunCutsLayout />}>
-            <Route index element={<RunCutsTable />} />
-            <Route path="drivers" element={<DriversRoster />} />
-            <Route path="vehicles" element={<VehiclesRoster />} />
-            <Route path="tracker" element={<TrackerDashboard />} />
+            <Route index element={allow("master_run_cuts.run_cuts", <RunCutsTable />)} />
+            <Route path="drivers" element={allow("master_run_cuts.drivers", <DriversRoster />)} />
+            <Route path="vehicles" element={allow("master_run_cuts.vehicles", <VehiclesRoster />)} />
+            <Route path="tracker" element={allow("master_run_cuts.tracker", <TrackerDashboard />)} />
           </Route>
           <Route path="/deployment" element={<DeploymentLayout />}>
-            <Route index element={<LiveSchedule />} />
-            <Route path="standby-utilization" element={<StandbyUtilization />} />
-            <Route path="issue-log" element={<IssueLog />} />
-            <Route path="client-report" element={<ClientReport />} />
-            <Route path="reporting" element={<Reporting />} />
-            <Route path="schedule-history" element={<ScheduleHistory />} />
-            <Route path="receiving-requests" element={<ReceivingRequests />} />
-            <Route path="posts" element={<DeploymentPosts />} />
-            <Route path="tracker-log" element={<ActivityLog />} />
+            <Route index element={allow("deployment.live_schedule", <LiveSchedule />)} />
+            <Route path="standby-utilization" element={allow("deployment.standby_utilization", <StandbyUtilization />)} />
+            <Route path="issue-log" element={allow("deployment.issue_log", <IssueLog />)} />
+            <Route path="client-report" element={allow("deployment.client_report", <ClientReport />)} />
+            <Route path="reporting" element={allow("deployment.reporting", <Reporting />)} />
+            <Route path="schedule-history" element={allow("deployment.schedule_history", <ScheduleHistory />)} />
+            <Route path="receiving-requests" element={allow("deployment.receiving_requests", <ReceivingRequests />)} />
+            <Route path="posts" element={allow("deployment.posts", <DeploymentPosts />)} />
+            <Route path="tracker-log" element={allow("deployment.tracker_log", <ActivityLog />)} />
           </Route>
           <Route path="/elt-reporting" element={<EltReportingLayout />}>
-            <Route index element={<EltReporting />} />
+            <Route index element={allow("elt_reporting.operations_report", <EltReporting />)} />
           </Route>
-          <Route path="/leaderboard" element={<Leaderboard />} />
+          <Route path="/leaderboard" element={allow("leaderboard", <Leaderboard />)} />
           <Route path="/network-success" element={<NetworkSuccessLayout />}>
-            <Route index element={<ExcelSubmissions />} />
-            <Route path="performance" element={<NetworkPerformance />} />
-            <Route path="reallocation-requests" element={<ReallocationRequests />} />
-            <Route path="posts" element={<NetworkSuccessPosts />} />
-            <Route path="email-templates" element={<EmailTemplates />} />
-            <Route path="ld-helper" element={<LdHelper />} />
+            <Route index element={allow("network_success.excel_submissions", <ExcelSubmissions />)} />
+            <Route path="performance" element={allow("network_success.performance", <NetworkPerformance />)} />
+            <Route path="reallocation-requests" element={allow("network_success.reallocation_requests", <ReallocationRequests />)} />
+            <Route path="posts" element={allow("network_success.posts", <NetworkSuccessPosts />)} />
+            <Route path="email-templates" element={allow("network_success.email_templates", <EmailTemplates />)} />
+            <Route path="ld-helper" element={allow("network_success.ld_helper", <LdHelper />)} />
           </Route>
           <Route path="/customer-service" element={<CustomerServiceLayout />}>
-            <Route index element={<CustomerServiceEntries />} />
-            <Route path="analytics" element={<CustomerServiceAnalytics />} />
+            <Route index element={allow("customer_service.monthly_counts", <CustomerServiceEntries />)} />
+            <Route path="analytics" element={allow("customer_service.analytics", <CustomerServiceAnalytics />)} />
           </Route>
           <Route path="/safety" element={<SafetyLayout />}>
-            <Route index element={<SafetyEntries />} />
-            <Route path="scores" element={<SafetyScores />} />
-            <Route path="analytics" element={<SafetyAnalytics />} />
+            <Route index element={allow("safety.accidents", <SafetyEntries />)} />
+            <Route path="scores" element={allow("safety.scores", <SafetyScores />)} />
+            <Route path="analytics" element={allow("safety.analytics", <SafetyAnalytics />)} />
           </Route>
           <Route path="/operations-reporting" element={<OperationsReportingLayout />}>
-            <Route index element={<KpiTracker />} />
-            <Route path="dashboard" element={<MonthlyDashboard />} />
-            <Route path="cap" element={<CapQueue />} />
-            <Route path="cap-reporting" element={<CapReporting />} />
+            <Route index element={allow("operations_reporting.kpi_tracker", <KpiTracker />)} />
+            <Route path="dashboard" element={allow("operations_reporting.monthly_dashboard", <MonthlyDashboard />)} />
+            <Route path="cap" element={allow("operations_reporting.cap", <CapQueue />)} />
+            <Route path="cap-reporting" element={allow("operations_reporting.cap_reporting", <CapReporting />)} />
           </Route>
-          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/settings" element={allow("settings.general", <SettingsPage />)} />
           <Route path="/settings/users" element={<UserAdmin />} />
+          <Route path="/access-denied" element={<AccessDenied />} />
+          <Route path="*" element={<HomeRedirect />} />
         </Route>
       </Route>
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
 }
