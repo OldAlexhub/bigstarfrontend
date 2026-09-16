@@ -7,7 +7,7 @@ describe("calculateTui", () => {
     const result = calculateTui(DEFAULT_TUI_INPUTS, []);
     expect(result.ready).toBe(false);
     expect(result.missingDetails).toEqual([
-      "Enter the provider's required Core Hours.",
+      "Enter the provider's Core Hour Target.",
       "Enter the Core Hours actually performed.",
       "Select whether this division pays per trip or per hour.",
     ]);
@@ -21,11 +21,11 @@ describe("calculateTui", () => {
     expect(result.hasReached100).toBe(false);
   });
 
-  test("flags 100% Core Hour fulfillment and uses the full-TUI talking point", () => {
+  test("flags 100% Core Hour fulfillment", () => {
     const result = calculateTui({ requiredCoreHours: "50", actualCoreHours: "50", paymentMethod: "per_hour" }, []);
     expect(result.hasReached100).toBe(true);
     expect(result.hoursRemaining).toBe(0);
-    expect(result.talkingPoint).toBe("You completed all of your required Core Hours, so you reached 100% fulfillment and earned the full TUI available under your Schedule A.");
+    expect(result.visualExplanation).toContain("reached their full 50-hour Core Hour Target");
   });
 
   test("does not require Schedule A tiers or a base rate to explain fulfillment", () => {
@@ -47,14 +47,12 @@ describe("calculateTui", () => {
     expect(result.finalRate).toBe(19);
     expect(result.nextTier.label).toBe("Tier 3");
     expect(result.hoursToNextTier).toBe(5);
-    expect(result.talkingPoint).toContain('You\'re in the "Tier 2" tier, which pays 19.00 per trip.');
   });
 
   test("computes total pay for a per-trip division once trips completed and a base rate are entered", () => {
     const result = calculateTui({ requiredCoreHours: "50", actualCoreHours: "45", paymentMethod: "per_trip", baseRate: "15", tripsCompleted: "20" }, []);
     expect(result.totalPayReady).toBe(true);
     expect(result.totalPay).toBe(300);
-    expect(result.talkingPoint).toContain("For 20 completed trips, that's a total of $300.00.");
   });
 
   test("does not compute total pay for a per-hour division, even if trips completed is set", () => {
@@ -70,11 +68,11 @@ describe("calculateTui", () => {
     expect(perHour.paymentMethodFulfillmentExplanation).toMatch(/hourly rate/);
   });
 
-  test("builds a Network Success talking point with the actual numbers", () => {
+  test("builds a visual explanation with the actual numbers", () => {
     const result = calculateTui({ requiredCoreHours: "50", actualCoreHours: "45", paymentMethod: "per_trip" }, []);
-    expect(result.talkingPoint).toContain("required to complete 50 Core Hours and completed 45");
-    expect(result.talkingPoint).toContain("90.0% fulfillment");
-    expect(result.talkingPoint).toContain("Schedule A");
+    expect(result.visualExplanation).toContain("completed 45 of their 50-hour Core Hour Target");
+    expect(result.visualExplanation).toContain("90.0% fulfillment");
+    expect(result.visualExplanation).toContain("Schedule A");
   });
 });
 
@@ -82,7 +80,7 @@ describe("TuiHelper", () => {
   test("explains Core Hour fulfillment from the three required inputs, with no save action", () => {
     render(<TuiHelper />);
 
-    fireEvent.change(screen.getByLabelText("Required Core Hours"), { target: { value: "50" } });
+    fireEvent.change(screen.getByLabelText("Core Hour Target"), { target: { value: "50" } });
     fireEvent.change(screen.getByLabelText("Actual Core Hours Performed"), { target: { value: "45" } });
     fireEvent.click(screen.getByRole("radio", { name: "Per Trip" }));
 
@@ -90,6 +88,15 @@ describe("TuiHelper", () => {
     expect(screen.getByText(/paid for each completed trip/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /save/i })).not.toBeInTheDocument();
     expect(screen.getByText("Not saved")).toBeInTheDocument();
+  });
+
+  test("explains TUI in plain English, with the golden rule and the Revenue vs. Scheduled Hours distinction up front", () => {
+    render(<TuiHelper />);
+    expect(screen.getByText(/TUI \(Top Up Incentive\) is a bonus/)).toBeInTheDocument();
+    expect(screen.getByText("The golden rule")).toBeInTheDocument();
+    expect(screen.getByText(/Log in right when your scheduled hours start/)).toBeInTheDocument();
+    expect(screen.getByText("Scheduled Service Hours")).toBeInTheDocument();
+    expect(screen.getByText(/actually spent transporting a client or clients/)).toBeInTheDocument();
   });
 
   test("shows a teaching example once a payment method is chosen, without requiring Schedule A entry", () => {
@@ -108,16 +115,24 @@ describe("TuiHelper", () => {
     expect(details.open).toBe(false);
   });
 
+  test("seeds the optional Schedule A with the standard Core Incentive bands, with blank TUI amounts", () => {
+    render(<TuiHelper />);
+    expect(screen.getByLabelText("Tier 1 name")).toHaveValue("<79.9%");
+    expect(screen.getByLabelText("Tier 1 minimum Core Hour fulfillment percent")).toHaveValue(0);
+    expect(screen.getByLabelText("Tier 5 name")).toHaveValue("98 - 100%");
+    expect(screen.getByLabelText("Tier 5 minimum Core Hour fulfillment percent")).toHaveValue(98);
+    expect(screen.getByLabelText("Tier 6 name")).toHaveValue(">101%");
+    expect(screen.getByLabelText("Tier 1 TUI amount")).toHaveValue(null);
+  });
+
   test("the teaching example switches to the Schedule A rates entered below, instead of the generic illustration", () => {
     render(<TuiHelper />);
     fireEvent.click(screen.getByRole("radio", { name: "Per Trip" }));
     expect(screen.getByText("$10.00 / trip")).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Base Rate"), { target: { value: "15" } });
-    fireEvent.change(screen.getByLabelText("Tier 1 minimum Core Hour fulfillment percent"), { target: { value: "80" } });
-    fireEvent.change(screen.getByLabelText("Tier 1 TUI amount"), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText("Tier 5 TUI amount"), { target: { value: "2" } });
 
-    expect(screen.getByText("$15.00 / trip")).toBeInTheDocument();
     expect(screen.getByText("$17.00 / trip")).toBeInTheDocument();
     expect(screen.queryByText("$10.00 / trip")).not.toBeInTheDocument();
     expect(screen.getByText(/From the Schedule A entered below/)).toBeInTheDocument();
@@ -134,7 +149,7 @@ describe("TuiHelper", () => {
 
   test("shows total pay once trips completed and a base rate are entered for a per-trip division", () => {
     render(<TuiHelper />);
-    fireEvent.change(screen.getByLabelText("Required Core Hours"), { target: { value: "50" } });
+    fireEvent.change(screen.getByLabelText("Core Hour Target"), { target: { value: "50" } });
     fireEvent.change(screen.getByLabelText("Actual Core Hours Performed"), { target: { value: "45" } });
     fireEvent.click(screen.getByRole("radio", { name: "Per Trip" }));
     fireEvent.change(screen.getByLabelText("Trips Completed"), { target: { value: "20" } });

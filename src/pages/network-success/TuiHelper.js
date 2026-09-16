@@ -47,7 +47,7 @@ const PaymentMethodPicker = ({ value, onChange }) => (
 // Manager types, so it doubles as a live summary once the form is filled in.
 const FlowDiagram = ({ result }) => {
   const steps = [
-    { label: "Required Core Hours", value: result.requiredCoreHours ?? "—" },
+    { label: "Core Hour Target", value: result.requiredCoreHours ?? "—" },
     { label: "Actual Core Hours", value: result.actualCoreHours ?? "—" },
     { label: "Fulfillment %", value: result.fulfillmentPercent != null ? `${result.fulfillmentPercent.toFixed(0)}%` : "—" },
     { label: "TUI tier", value: result.achievedTier ? result.achievedTier.label : result.ready ? "See Schedule A" : "—" },
@@ -171,18 +171,6 @@ const ResultRow = ({ label, value, emphasize }) => (
 );
 
 const Result = ({ result }) => {
-  const [copied, setCopied] = useState(false);
-
-  const copyTalkingPoint = () => {
-    if (!result.talkingPoint) return;
-    if (navigator?.clipboard?.writeText) {
-      navigator.clipboard.writeText(result.talkingPoint).then(() => {
-        setCopied(true);
-        window.setTimeout(() => setCopied(false), 1500);
-      }).catch(() => {});
-    }
-  };
-
   if (!result.ready) {
     return (
       <section aria-live="polite" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -202,7 +190,7 @@ const Result = ({ result }) => {
       <section aria-labelledby="tui-figures-heading" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <p id="tui-figures-heading" className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">At a glance</p>
         <dl className="mt-2 divide-y divide-slate-100 text-sm">
-          <ResultRow label="Core Hours required" value={result.requiredCoreHours} />
+          <ResultRow label="Core Hour Target" value={result.requiredCoreHours} />
           <ResultRow label="Core Hours performed" value={result.actualCoreHours} />
           <ResultRow label="Core Hour fulfillment" value={percent(result.fulfillmentPercent)} emphasize />
           <ResultRow label="Core Hours remaining" value={result.hasReached100 ? "0 - 100% reached" : result.hoursRemaining} />
@@ -230,20 +218,6 @@ const Result = ({ result }) => {
         <p className="mt-3 text-sm leading-6 text-slate-700">{result.visualExplanation}</p>
         <p className="mt-2 text-sm leading-6 text-slate-700">{result.paymentMethodFulfillmentExplanation}</p>
       </section>
-
-      <section aria-labelledby="tui-explain-heading" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <p id="tui-explain-heading" className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Network Success talking point</p>
-        <p className="mt-2 text-sm leading-6 text-slate-700">{result.simpleExplanation}</p>
-        {result.talkingPoint && (
-          <div className="mt-3 rounded-lg border border-brand-200 bg-brand-50 px-3.5 py-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.1em] text-brand-700">Say this to the provider</p>
-            <p className="mt-1.5 text-sm leading-6 text-slate-800">{result.talkingPoint}</p>
-            <button type="button" onClick={copyTalkingPoint} className="mt-2 rounded-md border border-brand-300 bg-white px-2.5 py-1 text-xs font-semibold text-brand-700 hover:bg-brand-100">
-              {copied ? "Copied" : "Copy talking point"}
-            </button>
-          </div>
-        )}
-      </section>
     </div>
   );
 };
@@ -268,13 +242,30 @@ const TuiHelper = () => {
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-600">Learn TUI in 30 seconds</p>
           <h2 id="tui-helper-heading" className="mt-1 text-2xl font-semibold text-slate-900">TUI Helper</h2>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
-            Core Hours determine the provider's TUI tier, and the TUI tier determines their rate. Enter the
-            provider's Core Hours below to see - and explain - exactly how that works.
-          </p>
         </div>
         <span className="inline-flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm"><span className="h-2 w-2 rounded-full bg-emerald-500" />Not saved</span>
       </div>
+
+      <section aria-label="TUI in plain English" className="mb-5 rounded-xl border border-brand-200 bg-brand-50 p-4 sm:p-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.1em] text-brand-700">TUI, in plain English</p>
+        <p className="mt-2 text-base leading-7 text-slate-800">TUI (Top Up Incentive) is a bonus for working your full Scheduled Hours. The more of your scheduled time you actually work, the bigger the bonus gets.</p>
+
+        <div className="mt-3 rounded-lg border border-brand-300 bg-white px-3.5 py-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.1em] text-brand-700">The golden rule</p>
+          <p className="mt-1 text-sm leading-6 text-slate-800">Log in right when your scheduled hours start, and log out right when it ends. Do that every day, and you hit 100% - the full Top Up Incentive.</p>
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-lg border border-slate-200 bg-white p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Scheduled Service Hours</p>
+            <p className="mt-1 text-sm leading-6 text-slate-700">The full time a provider is on the clock for their shift, start to end.</p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-white p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Revenue Hours</p>
+            <p className="mt-1 text-sm leading-6 text-slate-700">The time actually spent transporting a client or clients.</p>
+          </div>
+        </div>
+      </section>
 
       <FlowDiagram result={result} />
 
@@ -282,8 +273,12 @@ const TuiHelper = () => {
         <div className="space-y-5">
           <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
             <h3 className="text-sm font-semibold uppercase tracking-[0.1em] text-slate-500">Provider's Core Hours</h3>
+            <p className="mt-1 text-sm leading-6 text-slate-500">
+              Core Hours determine the provider's TUI tier, and the TUI tier determines their rate. Enter the
+              provider's Core Hours below to see - and explain - exactly how that works.
+            </p>
             <div className="mt-3 grid gap-4 sm:grid-cols-2">
-              <NumberField label="Required Core Hours" value={inputs.requiredCoreHours} onChange={(value) => update("requiredCoreHours", value)} />
+              <NumberField label="Core Hour Target" value={inputs.requiredCoreHours} onChange={(value) => update("requiredCoreHours", value)} />
               <NumberField label="Actual Core Hours Performed" value={inputs.actualCoreHours} onChange={(value) => update("actualCoreHours", value)} />
             </div>
           </section>
@@ -314,10 +309,8 @@ const TuiHelper = () => {
               </span>
             </summary>
             <p className="mt-2 text-xs leading-5 text-slate-500">Only fill this in if you have the division's actual Schedule A numbers on hand. Leave it blank to keep this a pure explainer.</p>
-            <div className="mt-3 grid gap-4 sm:grid-cols-3">
-              <NumberField label="Base Rate" value={inputs.baseRate} onChange={(value) => update("baseRate", value)} step="0.01" help="Before any TUI is added." />
-              <NumberField label="Bonus Hours beyond requirement (optional)" value={inputs.bonusHours} onChange={(value) => update("bonusHours", value)} />
-              <NumberField label="Bonus Rate (optional)" value={inputs.bonusRate} onChange={(value) => update("bonusRate", value)} step="0.01" />
+            <div className="mt-3 max-w-xs">
+              <NumberField label="Base Rate" value={inputs.baseRate} onChange={(value) => update("baseRate", value)} step="0.01" help="Before any TUI is added. The >101% tier covers any above-target bonus - there's no separate bonus rate." />
             </div>
             <div className="mt-4">
               <div className="flex items-center justify-between">
@@ -339,7 +332,7 @@ const TuiHelper = () => {
         </div>
       </div>
 
-      <aside className="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900"><span className="font-semibold">Schedule A check:</span> The example rates above are for teaching the concept only. For a real provider, always confirm the division's actual Schedule A - Core Hour requirement, TUI tiers, base rate, payment method, and bonus rules - before quoting a number.</aside>
+      <aside className="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900"><span className="font-semibold">Schedule A check:</span> The example rates above are for teaching the concept only. For a real provider, always confirm the division's actual Schedule A - Core Hour Target, TUI tiers, base rate, and payment method - before quoting a number.</aside>
     </section>
   );
 };
