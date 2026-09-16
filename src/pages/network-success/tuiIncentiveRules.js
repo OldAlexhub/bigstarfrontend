@@ -32,6 +32,12 @@ export const createTuiTier = (overrides = {}) => ({ id: nextTierId++, label: "",
 // divisions' Schedule As. The bands themselves are fixed company-wide; only the TUI
 // dollar amount for each band differs by division, so those start blank - the Network
 // Success Manager only has to plug in that division's numbers, not rebuild the ladder.
+//
+// The "98 - 100%" and ">101%" labels are printed as closed/open ranges, but the engine
+// only stores each tier's minimum (see the achieved-tier lookup below) - so a value like
+// 100.50% is engine-correct as "98 - 100%" even though the label says otherwise, and
+// there is no explicit owner for 100.01-100.99%. That's a business-rule precision gap in
+// how these bands are defined, not a bug in the calculation.
 export const DEFAULT_TUI_TIERS = [
   createTuiTier({ label: "<79.9%", threshold: "0" }),
   createTuiTier({ label: "80 - 84.99%", threshold: "80" }),
@@ -158,6 +164,18 @@ export const calculateTui = (inputs = {}, tiers = []) => {
     : `Their ${roundedPercent}% fulfillment determines their TUI tier. That tier determines their hourly rate.`;
 
   // Optional: apply the actual division's Schedule A, only if it has been entered.
+  //
+  // Known limitation: each tier stores only a minimum threshold, so the achieved tier
+  // is "the highest tier whose minimum the fulfillment percentage has reached" - there
+  // is no separate upper bound. That's a deliberate, correct model for an open-ended top
+  // tier (">101%" has no ceiling), but it means a tier's own label can print a closed
+  // range - e.g. "98 - 100%" - that this engine doesn't enforce as a ceiling: 100.50%
+  // still lands in "98 - 100%" because 101 hasn't been reached yet, and exactly 101.00%
+  // lands in ">101%" even though that label reads as strictly greater than 101. Where
+  // Schedule A bands are meant to tile the number line without gaps or overlaps, this is
+  // a business-rule precision question - what should own 100.01-100.99%? - not something
+  // this engine can resolve on its own; it would need each tier's own upper bound, which
+  // the Network Success Manager would have to supply per division.
   let achievedTier = null;
   let nextTier = null;
   for (const tier of validTiers) {
