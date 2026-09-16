@@ -77,6 +77,13 @@ export const PAYMENT_METHOD_TEACHING_EXAMPLES = {
 const isEnteredNumber = (value) => value !== "" && value !== null && value !== undefined && Number.isFinite(Number(value));
 const nonNegativeNumber = (value) => Math.max(0, Number(value) || 0);
 
+// Rounds to hundredths (the finest precision used in the Core Incentive bands, e.g.
+// "84.99%") before it's ever compared against a tier threshold or shown on screen, so
+// the displayed percentage and the tier it lands in always agree. The Number.EPSILON
+// nudge avoids the classic floating-point case where a value that should land exactly
+// on a boundary (e.g. 49 / 50 * 100) comes out a hair under it and rounds the wrong way.
+const roundToHundredth = (value) => Math.round((value + Number.EPSILON) * 100) / 100;
+
 export const calculateTui = (inputs = {}, tiers = []) => {
   const missingDetails = [];
 
@@ -132,10 +139,15 @@ export const calculateTui = (inputs = {}, tiers = []) => {
 
   const requiredCoreHours = nonNegativeNumber(inputs.requiredCoreHours);
   const actualCoreHours = nonNegativeNumber(inputs.actualCoreHours);
-  const fulfillmentPercent = (actualCoreHours / requiredCoreHours) * 100;
-  const hoursRemaining = Math.max(0, requiredCoreHours - actualCoreHours);
+  // Rounded once, here, and reused for every tier comparison and every display below -
+  // never re-derived from the raw division, so nothing downstream can drift from it.
+  const fulfillmentPercent = roundToHundredth((actualCoreHours / requiredCoreHours) * 100);
+  const hoursRemaining = roundToHundredth(Math.max(0, requiredCoreHours - actualCoreHours));
   const hasReached100 = actualCoreHours >= requiredCoreHours;
-  const roundedPercent = fulfillmentPercent.toFixed(1);
+  // Two decimals throughout - matching the finest precision the Core Incentive bands
+  // themselves are defined to (e.g. "97.99%") - so a displayed percentage can never
+  // look like it crossed into a tier it didn't actually reach.
+  const roundedPercent = fulfillmentPercent.toFixed(2);
 
   const visualExplanation = hasReached100
     ? `The provider reached their full ${requiredCoreHours}-hour Core Hour Target. That's 100% fulfillment - the full TUI available under their Schedule A.`
@@ -152,7 +164,7 @@ export const calculateTui = (inputs = {}, tiers = []) => {
     if (fulfillmentPercent >= tier.threshold) achievedTier = tier;
     else if (!nextTier) nextTier = tier;
   }
-  const hoursToNextTier = nextTier ? Math.max(0, (nextTier.threshold / 100) * requiredCoreHours - actualCoreHours) : null;
+  const hoursToNextTier = nextTier ? roundToHundredth(Math.max(0, (nextTier.threshold / 100) * requiredCoreHours - actualCoreHours)) : null;
 
   const tuiAmount = achievedTier ? achievedTier.tuiAmount : 0;
 

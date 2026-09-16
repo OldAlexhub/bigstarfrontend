@@ -10,7 +10,10 @@ import {
 } from "./tuiIncentiveRules";
 
 const currency = (value) => Number(value).toLocaleString(undefined, { style: "currency", currency: "USD" });
-const percent = (value) => `${Number(value).toFixed(1)}%`;
+// Two decimals - matching the Core Incentive bands' own precision (e.g. "97.99%") - so
+// this can never display a percentage that looks like it belongs to a different tier
+// than the one actually shown next to it.
+const percent = (value) => `${Number(value).toFixed(2)}%`;
 
 const NumberField = ({ label, value, onChange, step = "1", help }) => (
   <label className="block text-sm font-medium text-slate-700">
@@ -49,7 +52,7 @@ const FlowDiagram = ({ result }) => {
   const steps = [
     { label: "Core Hour Target", value: result.requiredCoreHours ?? "—" },
     { label: "Actual Core Hours", value: result.actualCoreHours ?? "—" },
-    { label: "Fulfillment %", value: result.fulfillmentPercent != null ? `${result.fulfillmentPercent.toFixed(0)}%` : "—" },
+    { label: "Fulfillment %", value: result.fulfillmentPercent != null ? percent(result.fulfillmentPercent) : "—" },
     { label: "TUI tier", value: result.achievedTier ? result.achievedTier.label : result.ready ? "See Schedule A" : "—" },
     { label: "Pay rate", value: result.rateReady ? currency(result.finalRate) : result.ready ? "See Schedule A" : "—" },
     { label: "Per trip / per hour", value: result.paymentMethodLabel ?? "—" },

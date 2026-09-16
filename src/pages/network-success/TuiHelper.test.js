@@ -35,6 +35,32 @@ describe("calculateTui", () => {
     expect(result.rateReady).toBe(false);
   });
 
+  test("keeps the displayed percentage and the achieved tier consistent right at a boundary", () => {
+    // 48/49 = 97.959...%, which rounds to "98.0%" at one decimal but is genuinely
+    // below the 98% band at the bands' own two-decimal precision. The displayed
+    // percentage must agree with the tier actually selected, not contradict it.
+    const tiers = [
+      { id: 1, label: "90 - 97.99%", threshold: "90", tuiAmount: "4" },
+      { id: 2, label: "98 - 100%", threshold: "98", tuiAmount: "6" },
+    ];
+    const result = calculateTui({ requiredCoreHours: "49", actualCoreHours: "48", paymentMethod: "per_trip" }, tiers);
+    expect(result.fulfillmentPercent).toBeCloseTo(97.96, 2);
+    expect(result.achievedTier.label).toBe("90 - 97.99%");
+    expect(result.visualExplanation).toContain("97.96%");
+  });
+
+  test("lands exactly on a tier boundary despite floating-point division", () => {
+    // 49/50 * 100 is exactly 98 mathematically, but floating-point division can drift
+    // a hair either side of that - the rounded comparison must still land on the tier.
+    const tiers = [
+      { id: 1, label: "90 - 97.99%", threshold: "90", tuiAmount: "4" },
+      { id: 2, label: "98 - 100%", threshold: "98", tuiAmount: "6" },
+    ];
+    const result = calculateTui({ requiredCoreHours: "50", actualCoreHours: "49", paymentMethod: "per_trip" }, tiers);
+    expect(result.fulfillmentPercent).toBe(98);
+    expect(result.achievedTier.label).toBe("98 - 100%");
+  });
+
   test("applies an optionally entered Schedule A to find the tier and final rate", () => {
     const tiers = [
       { id: 1, label: "Tier 1", threshold: "80", tuiAmount: "2" },
@@ -71,7 +97,7 @@ describe("calculateTui", () => {
   test("builds a visual explanation with the actual numbers", () => {
     const result = calculateTui({ requiredCoreHours: "50", actualCoreHours: "45", paymentMethod: "per_trip" }, []);
     expect(result.visualExplanation).toContain("completed 45 of their 50-hour Core Hour Target");
-    expect(result.visualExplanation).toContain("90.0% fulfillment");
+    expect(result.visualExplanation).toContain("90.00% fulfillment");
     expect(result.visualExplanation).toContain("Schedule A");
   });
 });
@@ -84,7 +110,7 @@ describe("TuiHelper", () => {
     fireEvent.change(screen.getByLabelText("Actual Core Hours Performed"), { target: { value: "45" } });
     fireEvent.click(screen.getByRole("radio", { name: "Per Trip" }));
 
-    expect(screen.getAllByText("90.0%").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("90.00%").length).toBeGreaterThan(0);
     expect(screen.getByText(/paid for each completed trip/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /save/i })).not.toBeInTheDocument();
     expect(screen.getByText("Not saved")).toBeInTheDocument();
