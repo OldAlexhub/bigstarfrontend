@@ -159,6 +159,16 @@ const NetworkSuccessLayout = () => {
       >
         LD Helper
       </NavLink>}
+      {canAccessPage(user, "network_success.tui_helper") && <NavLink
+        to="/network-success/tui-helper"
+        className={({ isActive }) =>
+          `inline-flex shrink-0 border-b-2 px-1 py-3 text-sm font-medium ${
+            isActive ? "border-brand-500 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-700"
+          }`
+        }
+      >
+        TUI Helper
+      </NavLink>}
     </div>
     <Outlet />
     </div>

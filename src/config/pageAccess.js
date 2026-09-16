@@ -42,6 +42,7 @@ export const PAGE_ACCESS_GROUPS = [
       { key: "network_success.posts", label: "Posts", path: "/network-success/posts" },
       { key: "network_success.email_templates", label: "Email Templates", path: "/network-success/email-templates" },
       { key: "network_success.ld_helper", label: "LD Helper", path: "/network-success/ld-helper" },
+      { key: "network_success.tui_helper", label: "TUI Helper", path: "/network-success/tui-helper" },
     ],
   },
   {

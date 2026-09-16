@@ -26,6 +26,7 @@ import ExcelSubmissions from "./pages/network-success/ExcelSubmissions";
 import NetworkPerformance from "./pages/network-success/NetworkPerformance";
 import EmailTemplates from "./pages/network-success/EmailTemplates";
 import LdHelper from "./pages/network-success/LdHelper";
+import TuiHelper from "./pages/network-success/TuiHelper";
 import ReallocationRequests from "./pages/network-success/ReallocationRequests";
 import CustomerServiceLayout from "./pages/customer-service/CustomerServiceLayout";
 import CustomerServiceEntries from "./pages/customer-service/CustomerServiceEntries";
@@ -91,6 +92,7 @@ function App() {
             <Route path="posts" element={allow("network_success.posts", <NetworkSuccessPosts />)} />
             <Route path="email-templates" element={allow("network_success.email_templates", <EmailTemplates />)} />
             <Route path="ld-helper" element={allow("network_success.ld_helper", <LdHelper />)} />
+            <Route path="tui-helper" element={allow("network_success.tui_helper", <TuiHelper />)} />
           </Route>
           <Route path="/customer-service" element={<CustomerServiceLayout />}>
             <Route index element={allow("customer_service.monthly_counts", <CustomerServiceEntries />)} />
