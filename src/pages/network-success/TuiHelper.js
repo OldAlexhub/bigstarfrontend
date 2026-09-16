@@ -72,23 +72,45 @@ const FlowDiagram = ({ result }) => {
   );
 };
 
-const TeachingExample = ({ paymentMethod }) => {
-  const example = PAYMENT_METHOD_TEACHING_EXAMPLES[paymentMethod];
-  if (!example) {
+// Once a base rate and at least one tier are entered in the optional Schedule A
+// section below, this walks through THAT division's real rate ladder instead of the
+// generic illustrative numbers - it follows whatever was actually typed in.
+const TeachingExample = ({ result }) => {
+  const { paymentMethod, baseRateEntered, baseRate, validTiers, achievedTier, ready } = result;
+  if (!paymentMethod) {
     return <p className="text-sm leading-6 text-slate-500">Pick Per Trip or Per Hour above to see a simple example of how a TUI tier changes the rate.</p>;
   }
+
+  const usingSchedule = baseRateEntered && validTiers.length > 0;
+  const unit = usingSchedule ? (paymentMethod === "per_hour" ? "/ hour" : "/ trip") : PAYMENT_METHOD_TEACHING_EXAMPLES[paymentMethod].unit;
+  const showCurrent = usingSchedule && ready;
+
+  const rows = usingSchedule
+    ? [
+        { key: "base", tier: "Base rate", rate: baseRate, current: showCurrent && !achievedTier },
+        ...validTiers.map((tier) => ({ key: tier.id, tier: tier.label, rate: baseRate + tier.tuiAmount, current: showCurrent && achievedTier?.id === tier.id })),
+      ]
+    : PAYMENT_METHOD_TEACHING_EXAMPLES[paymentMethod].rows.map((row) => ({ key: row.tier, tier: row.tier, rate: row.rate, current: false }));
+
   return (
     <div>
       <p className="text-sm leading-6 text-slate-700">{PAYMENT_METHOD_CONCEPT_EXPLANATIONS[paymentMethod]}</p>
       <div className="mt-3 overflow-hidden rounded-lg border border-slate-200">
-        {example.rows.map((row) => (
-          <div key={row.tier} className="flex items-center justify-between border-b border-slate-100 bg-white px-3 py-2 text-sm last:border-0">
-            <span className="text-slate-600">{row.tier}</span>
-            <span className="font-semibold text-slate-900">{currency(row.rate)} {example.unit}</span>
+        {rows.map((row) => (
+          <div key={row.key} className={`flex items-center justify-between border-b border-slate-100 px-3 py-2 text-sm last:border-0 ${row.current ? "bg-brand-50" : "bg-white"}`}>
+            <span className="text-slate-600">
+              {row.tier}
+              {row.current && <span className="ml-1.5 rounded-full bg-brand-600 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Current</span>}
+            </span>
+            <span className="font-semibold text-slate-900">{currency(row.rate)} {unit}</span>
           </div>
         ))}
       </div>
-      <p className="mt-2 text-xs italic text-slate-400">Example only - not this division's real rates. Always use the applicable Schedule A.</p>
+      {usingSchedule ? (
+        <p className="mt-2 text-xs text-slate-400">From the Schedule A entered below.</p>
+      ) : (
+        <p className="mt-2 text-xs italic text-slate-400">Example only - not this division's real rates. Enter this division's Schedule A below to see its real numbers here.</p>
+      )}
     </div>
   );
 };
@@ -187,6 +209,12 @@ const Result = ({ result }) => {
           <ResultRow label="TUI tier achieved" value={result.achievedTier ? result.achievedTier.label : result.validTiers.length > 0 ? "Below lowest tier" : "Enter Schedule A below"} />
           <ResultRow label="Payment method" value={result.paymentMethodLabel} />
           <ResultRow label="Final rate" value={result.rateReady ? `${currency(result.finalRate)} ${result.paymentMethod === "per_hour" ? "/ hour" : "/ trip"}` : "Enter base rate below"} emphasize />
+          {result.paymentMethod === "per_trip" && (
+            <>
+              <ResultRow label="Trips completed" value={result.tripsCompleted ?? "Not entered"} />
+              <ResultRow label="Total pay" value={result.totalPayReady ? currency(result.totalPay) : "Enter trips + base rate"} emphasize />
+            </>
+          )}
         </dl>
         {!result.achievedTier && result.nextTier && (
           <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
@@ -265,10 +293,15 @@ const TuiHelper = () => {
             <div className="mt-3 max-w-xs">
               <PaymentMethodPicker value={inputs.paymentMethod} onChange={(value) => update("paymentMethod", value)} />
             </div>
+            {inputs.paymentMethod === "per_trip" && (
+              <div className="mt-4 max-w-xs">
+                <NumberField label="Trips Completed" value={inputs.tripsCompleted} onChange={(value) => update("tripsCompleted", value)} help="Multiplied by the final rate to show total pay for this period." />
+              </div>
+            )}
             <div className="mt-4 border-t border-slate-100 pt-4">
               <p className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">How a TUI tier changes the rate</p>
               <div className="mt-2">
-                <TeachingExample paymentMethod={inputs.paymentMethod} />
+                <TeachingExample result={result} />
               </div>
             </div>
           </section>

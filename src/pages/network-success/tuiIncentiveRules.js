@@ -16,6 +16,7 @@ export const DEFAULT_TUI_INPUTS = {
   requiredCoreHours: "",
   actualCoreHours: "",
   paymentMethod: "",
+  tripsCompleted: "",
   baseRate: "",
   bonusHours: "",
   bonusRate: "",
@@ -74,6 +75,20 @@ export const calculateTui = (inputs = {}, tiers = []) => {
 
   const paymentMethodLabel = PAYMENT_METHODS.find((method) => method.id === inputs.paymentMethod)?.label || null;
 
+  // Schedule A entry (base rate + tiers) is read independently of whether Core Hours
+  // are filled in yet, so the teaching example can reflect it as soon as it's typed in.
+  const validTiers = tiers
+    .filter((tier) => isEnteredNumber(tier.threshold))
+    .map((tier) => ({
+      id: tier.id,
+      label: tier.label?.trim() || `Tier at ${Number(tier.threshold)}%`,
+      threshold: Number(tier.threshold),
+      tuiAmount: nonNegativeNumber(tier.tuiAmount),
+    }))
+    .sort((a, b) => a.threshold - b.threshold);
+  const baseRateEntered = isEnteredNumber(inputs.baseRate);
+  const baseRate = baseRateEntered ? nonNegativeNumber(inputs.baseRate) : 0;
+
   if (missingDetails.length > 0) {
     return {
       ready: false,
@@ -89,17 +104,20 @@ export const calculateTui = (inputs = {}, tiers = []) => {
       visualExplanation: null,
       paymentMethodFulfillmentExplanation: null,
       talkingPoint: null,
-      validTiers: [],
+      validTiers,
       achievedTier: null,
       nextTier: null,
       hoursToNextTier: null,
-      baseRateEntered: false,
-      baseRate: 0,
+      baseRateEntered,
+      baseRate,
       tuiAmount: 0,
       bonusApplies: false,
       bonusRate: 0,
       rateReady: false,
       finalRate: null,
+      tripsCompleted: null,
+      totalPayReady: false,
+      totalPay: null,
     };
   }
 
@@ -119,16 +137,6 @@ export const calculateTui = (inputs = {}, tiers = []) => {
     : `Their ${roundedPercent}% fulfillment determines their TUI tier. That tier determines their hourly rate.`;
 
   // Optional: apply the actual division's Schedule A, only if it has been entered.
-  const validTiers = tiers
-    .filter((tier) => isEnteredNumber(tier.threshold))
-    .map((tier) => ({
-      id: tier.id,
-      label: tier.label?.trim() || `Tier at ${Number(tier.threshold)}%`,
-      threshold: Number(tier.threshold),
-      tuiAmount: nonNegativeNumber(tier.tuiAmount),
-    }))
-    .sort((a, b) => a.threshold - b.threshold);
-
   let achievedTier = null;
   let nextTier = null;
   for (const tier of validTiers) {
@@ -137,8 +145,6 @@ export const calculateTui = (inputs = {}, tiers = []) => {
   }
   const hoursToNextTier = nextTier ? Math.max(0, (nextTier.threshold / 100) * requiredCoreHours - actualCoreHours) : null;
 
-  const baseRateEntered = isEnteredNumber(inputs.baseRate);
-  const baseRate = baseRateEntered ? nonNegativeNumber(inputs.baseRate) : 0;
   const tuiAmount = achievedTier ? achievedTier.tuiAmount : 0;
 
   const bonusHoursEntered = isEnteredNumber(inputs.bonusHours) && Number(inputs.bonusHours) > 0;
@@ -149,11 +155,21 @@ export const calculateTui = (inputs = {}, tiers = []) => {
   const rateReady = baseRateEntered;
   const finalRate = rateReady ? baseRate + tuiAmount + bonusRate : null;
 
+  // Trips Completed only applies to per-trip divisions - a per-hour division's total
+  // pay is just the hourly rate, so there's nothing extra to multiply it by here.
+  const tripsCompletedEntered = inputs.paymentMethod === "per_trip" && isEnteredNumber(inputs.tripsCompleted);
+  const tripsCompleted = tripsCompletedEntered ? nonNegativeNumber(inputs.tripsCompleted) : null;
+  const totalPayReady = rateReady && tripsCompletedEntered;
+  const totalPay = totalPayReady ? finalRate * tripsCompleted : null;
+
   let talkingPoint = hasReached100
     ? "You completed all of your required Core Hours, so you reached 100% fulfillment and earned the full TUI available under your Schedule A."
     : `You were required to complete ${requiredCoreHours} Core Hours and completed ${actualCoreHours}. That puts you at ${roundedPercent}% fulfillment. Based on your Schedule A, ${roundedPercent}% places you in this TUI tier, which determines your applicable pay rate.`;
   if (achievedTier) {
     talkingPoint += ` You're in the "${achievedTier.label}" tier${rateReady ? `, which pays ${finalRate.toFixed(2)} ${inputs.paymentMethod === "per_hour" ? "per hour" : "per trip"}.` : "."}`;
+  }
+  if (totalPayReady) {
+    talkingPoint += ` For ${tripsCompleted} completed trip${tripsCompleted === 1 ? "" : "s"}, that's a total of $${totalPay.toFixed(2)}.`;
   }
 
   return {
@@ -181,5 +197,8 @@ export const calculateTui = (inputs = {}, tiers = []) => {
     bonusRate,
     rateReady,
     finalRate,
+    tripsCompleted,
+    totalPayReady,
+    totalPay,
   };
 };
