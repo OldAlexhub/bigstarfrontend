@@ -3,6 +3,7 @@ import { apiDelete, apiFormPost, apiGet, apiPost } from "../../api/client";
 
 const STEPS = ["Upload", "Match", "Review & Save"];
 export const RECENT_SUBMISSIONS_PAGE_SIZE = 3;
+export const MATCH_ROWS_PAGE_SIZE = 25;
 const sources = {
   vision: {
     label: "Vision",
@@ -346,6 +347,7 @@ const ExcelSubmissions = () => {
   const [resolutions, setResolutions] = useState({});
   const [excludedDates, setExcludedDates] = useState([]);
   const [expanded, setExpanded] = useState(null);
+  const [matchPage, setMatchPage] = useState(1);
   const [history, setHistory] = useState([]);
   const [success, setSuccess] = useState(null);
   const [pendingRemoval, setPendingRemoval] = useState(null);
@@ -404,6 +406,7 @@ const ExcelSubmissions = () => {
       setPreview(data);
       setResolutions({});
       setExcludedDates([]);
+      setMatchPage(1);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -473,6 +476,12 @@ const ExcelSubmissions = () => {
       };
     }).sort((a, b) => a.date.localeCompare(b.date) || a.route.localeCompare(b.route));
   }, [resolvedRows, resolutions, preview]);
+
+  const matchRows = preview?.rows || [];
+  const matchPageCount = Math.max(1, Math.ceil(matchRows.length / MATCH_ROWS_PAGE_SIZE));
+  const currentMatchPage = Math.min(matchPage, matchPageCount);
+  const matchRowsStart = (currentMatchPage - 1) * MATCH_ROWS_PAGE_SIZE;
+  const visibleMatchRows = matchRows.slice(matchRowsStart, matchRowsStart + MATCH_ROWS_PAGE_SIZE);
 
   const confirm = async () => {
     setBusy(true);
@@ -698,7 +707,7 @@ const ExcelSubmissions = () => {
                   <div className="hidden gap-3 bg-slate-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:grid lg:grid-cols-[100px_110px_minmax(90px,.8fr)_minmax(150px,1.25fr)_minmax(140px,1.2fr)_70px_minmax(140px,1.1fr)_36px]">
                     <span>Status</span><span>Date</span><span>Source route</span><span>Matched route</span><span>Operator / provider</span><span>Trips</span><span>Outcome</span><span />
                   </div>
-                  {preview.rows.map((row) => (
+                  {visibleMatchRows.map((row) => (
                     <MatchRow
                       key={row.id}
                       row={row}
@@ -710,6 +719,16 @@ const ExcelSubmissions = () => {
                       dateExcluded={excludedDates.includes(row.date)}
                     />
                   ))}
+                  {matchRows.length > MATCH_ROWS_PAGE_SIZE && (
+                    <nav aria-label="Match rows pagination" className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50 px-4 py-3">
+                      <p className="text-xs text-slate-500">Showing {matchRowsStart + 1}-{Math.min(matchRowsStart + MATCH_ROWS_PAGE_SIZE, matchRows.length)} of {matchRows.length}</p>
+                      <div className="flex items-center gap-2">
+                        <button type="button" disabled={currentMatchPage === 1} onClick={() => setMatchPage((page) => Math.max(1, page - 1))} className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
+                        <span className="min-w-20 text-center text-xs font-medium text-slate-600">Page {currentMatchPage} of {matchPageCount}</span>
+                        <button type="button" disabled={currentMatchPage === matchPageCount} onClick={() => setMatchPage((page) => Math.min(matchPageCount, page + 1))} className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
+                      </div>
+                    </nav>
+                  )}
                 </div>
                 <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
                   <button type="button" onClick={() => { setStep(1); setPreview(null); }} className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Back</button>

@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { apiDelete, apiFormPost, apiGet, apiPost } from "../../api/client";
-import ExcelSubmissions, { RECENT_SUBMISSIONS_PAGE_SIZE } from "./ExcelSubmissions";
+import ExcelSubmissions, { MATCH_ROWS_PAGE_SIZE, RECENT_SUBMISSIONS_PAGE_SIZE } from "./ExcelSubmissions";
 
 vi.mock("../../api/client", () => ({ apiDelete: vi.fn(), apiFormPost: vi.fn(), apiGet: vi.fn(), apiPost: vi.fn() }));
 
@@ -46,6 +46,58 @@ test("guided workflow blocks final review until an unresolved route is mapped or
   fireEvent.click(next);
   expect(screen.getByText("Review what will be saved")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Confirm and save" })).toBeEnabled();
+});
+
+test("shows match rows 25 at a time", async () => {
+  const rows = Array.from({ length: 27 }, (_, index) => {
+    const label = `Route ${String(index + 1).padStart(2, "0")}`;
+    return {
+      id: `v${index + 1}`,
+      severity: "clean",
+      date: "2026-09-08",
+      sourceRoute: label,
+      completedTrips: 10,
+      matchedRouteId: "route-1",
+      matchedRoute: "1029-B",
+      suggestions: [],
+      matchReason: "Normalized exact match",
+      sourceOperator: null,
+      operatorName: "Operator",
+      providerName: "Provider",
+      operationalOutcome: "Operated",
+      deployment: { provenance: {}, lateToFirst: 0, lateDeploy: 0 },
+    };
+  });
+  apiGet.mockResolvedValue({ submissions: [] });
+  apiFormPost.mockResolvedValue({ submission: pending });
+  apiPost.mockResolvedValue({
+    submission: { ...pending, status: "matched", counts: { ...pending.counts, automaticMatches: 27, routeBlockers: 0 } },
+    routes: [{ id: "route-1", code: "1029-B", type: "standard" }],
+    existingKeys: [],
+    rows,
+  });
+
+  const { container } = render(<ExcelSubmissions />);
+  const file = new File(["workbook"], "vision.xlsx", { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  fireEvent.change(container.querySelector('input[type="file"]'), { target: { files: [file] } });
+  fireEvent.click(screen.getByRole("button", { name: "Continue to matching" }));
+  expect(await screen.findByText("Confirm the division, then review matches")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Confirm & match" }));
+
+  expect(await screen.findByText("Route 01")).toBeInTheDocument();
+  expect(MATCH_ROWS_PAGE_SIZE).toBe(25);
+  expect(screen.getByText("Route 25")).toBeInTheDocument();
+  expect(screen.queryByText("Route 26")).not.toBeInTheDocument();
+  expect(screen.getByText("Showing 1-25 of 27")).toBeInTheDocument();
+
+  const pagination = screen.getByRole("navigation", { name: "Match rows pagination" });
+  fireEvent.click(within(pagination).getByRole("button", { name: "Next" }));
+
+  expect(screen.queryByText("Route 01")).not.toBeInTheDocument();
+  expect(screen.getByText("Route 26")).toBeInTheDocument();
+  expect(screen.getByText("Route 27")).toBeInTheDocument();
+  expect(screen.getByText("Showing 26-27 of 27")).toBeInTheDocument();
+  expect(within(pagination).getByRole("button", { name: "Next" })).toBeDisabled();
 });
 
 test("recent submissions can be removed and re-uploaded", async () => {
