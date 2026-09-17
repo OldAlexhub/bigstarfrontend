@@ -77,6 +77,12 @@ export const PAGE_ACCESS_GROUPS = [
     label: "Executive Reporting",
     pages: [
       { key: "elt_reporting.operations_report", label: "Operations Report", path: "/elt-reporting" },
+      {
+        key: "report_builder",
+        label: "Report Builder & Exports",
+        path: "/report-builder",
+        description: "Build, preview, save, and export company-wide reports.",
+      },
       { key: "leaderboard", label: "Leaderboard", path: "/leaderboard" },
     ],
   },

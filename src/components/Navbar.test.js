@@ -45,6 +45,16 @@ test("clicking a group reveals its items and closes after picking one", () => {
   expect(screen.queryByRole("link", { name: "Safety" })).not.toBeInTheDocument();
 });
 
+test("Reporting includes the custom Report Builder destination", () => {
+  render(<Navbar />);
+
+  fireEvent.click(screen.getByRole("button", { name: "Reporting" }));
+
+  expect(screen.getByRole("link", { name: "ELT Reporting" })).toHaveAttribute("href", "/elt-reporting");
+  expect(screen.getByRole("link", { name: "Report Builder" })).toHaveAttribute("href", "/report-builder");
+  expect(screen.getByRole("link", { name: "Leaderboard" })).toHaveAttribute("href", "/leaderboard");
+});
+
 test("a user with only safety access sees a single Performance group and no scheduling links", () => {
   mockUser = { name: "Safety Coordinator", role: "manager", sections: ["safety"] };
   render(<Navbar />);
@@ -57,6 +67,24 @@ test("a user with only safety access sees a single Performance group and no sche
   const panel = performance.closest("div").querySelector("div.absolute");
   expect(within(panel).getByRole("link", { name: "Safety" })).toBeInTheDocument();
   expect(within(panel).queryByRole("link", { name: "Customer Service" })).not.toBeInTheDocument();
+});
+
+test("a user assigned only Report Builder sees it in the Reporting menu", () => {
+  mockUser = {
+    name: "Reporting Manager",
+    role: "Manager",
+    sections: [],
+    pageAccessConfigured: true,
+    pageAccess: ["report_builder"],
+  };
+  render(<Navbar />);
+
+  expect(screen.queryByRole("button", { name: "Performance" })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Reporting" }));
+
+  expect(screen.getByRole("link", { name: "Report Builder" })).toHaveAttribute("href", "/report-builder");
+  expect(screen.queryByRole("link", { name: "ELT Reporting" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: "Leaderboard" })).not.toBeInTheDocument();
 });
 
 test("granular access links a section to the first assigned tab and hides unassigned sections", () => {

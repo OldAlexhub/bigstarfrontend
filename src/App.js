@@ -20,6 +20,7 @@ import StandbyUtilization from "./pages/deployment/StandbyUtilization";
 import EltReporting from "./pages/EltReporting";
 import EltReportingLayout from "./pages/elt-reporting/EltReportingLayout";
 import Leaderboard from "./pages/Leaderboard";
+import ReportBuilder from "./pages/ReportBuilder";
 import UserAdmin from "./pages/UserAdmin";
 import NetworkSuccessLayout from "./pages/network-success/NetworkSuccessLayout";
 import ExcelSubmissions from "./pages/network-success/ExcelSubmissions";
@@ -85,6 +86,7 @@ function App() {
             <Route index element={allow("elt_reporting.operations_report", <EltReporting />)} />
           </Route>
           <Route path="/leaderboard" element={allow("leaderboard", <Leaderboard />)} />
+          <Route path="/report-builder" element={allow("report_builder", <ReportBuilder />)} />
           <Route path="/network-success" element={<NetworkSuccessLayout />}>
             <Route index element={allow("network_success.excel_submissions", <ExcelSubmissions />)} />
             <Route path="performance" element={allow("network_success.performance", <NetworkPerformance />)} />

@@ -8,6 +8,7 @@ export const NAV_ITEMS = [
   { key: "safety", label: "Safety" },
   { key: "operations_reporting", label: "Operations Reporting" },
   { key: "elt_reporting", label: "ELT Reporting", pageKey: "elt_reporting.operations_report" },
+  { key: "report_builder", label: "Report Builder", pageKey: "report_builder" },
   { key: "leaderboard", label: "Leaderboard", pageKey: "leaderboard" },
 ];
 
@@ -18,7 +19,7 @@ export const NAV_FLAT_ITEM_KEYS = ["master_run_cuts", "deployment", "network_suc
 // Groups the rest of NAV_ITEMS for the navbar's dropdown menus.
 export const NAV_GROUPS = [
   { key: "performance", label: "Performance", itemKeys: ["safety", "customer_service", "operations_reporting"] },
-  { key: "reporting", label: "Reporting", itemKeys: ["elt_reporting", "leaderboard"] },
+  { key: "reporting", label: "Reporting", itemKeys: ["elt_reporting", "report_builder", "leaderboard"] },
 ];
 
 export const canAccess = (user, key) => {

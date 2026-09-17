@@ -27,4 +27,18 @@ test("legacy users retain all pages from their assigned sections until edited", 
 
 test("ELT receives every page automatically", () => {
   expect(canAccessPage({ role: "ELT", pageAccessConfigured: true, pageAccess: [] }, "leaderboard")).toBe(true);
+  expect(canAccessPage({ role: "ELT", pageAccessConfigured: true, pageAccess: [] }, "report_builder")).toBe(true);
+});
+
+test("Report Builder can be granted independently to a non-ELT user", () => {
+  const user = {
+    role: "Manager",
+    sections: [],
+    pageAccessConfigured: true,
+    pageAccess: ["report_builder"],
+  };
+
+  expect(canAccessPage(user, "report_builder")).toBe(true);
+  expect(canAccessPage(user, "elt_reporting.operations_report")).toBe(false);
+  expect(canAccessPage(user, "leaderboard")).toBe(false);
 });

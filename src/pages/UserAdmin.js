@@ -138,7 +138,10 @@ const UserForm = ({ form, setForm, divisions, isEdit, onSubmit, onCancel, submit
                   {group.pages.map((page) => (
                     <label key={page.key} className="flex items-start gap-2 text-sm text-slate-600">
                       <input type="checkbox" className="mt-0.5" checked={form.pageAccess.includes(page.key)} onChange={() => togglePage(page.key)} />
-                      {page.label}
+                      <span>
+                        <span className="block">{page.label}</span>
+                        {page.description && <span className="mt-0.5 block text-xs leading-4 text-slate-400">{page.description}</span>}
+                      </span>
                     </label>
                   ))}
                 </div>
