@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
-import { apiGet, API_BASE } from "../../api/client";
+import { apiDownload, apiGet } from "../../api/client";
 import MetricCard from "../../components/MetricCard";
 import { DISPOSITION_OPTIONS } from "../../config/dispositions";
 import { isOsrDisruptionType } from "../../config/disruptionTypes";
@@ -161,18 +161,9 @@ const Reporting = () => {
     setDownloading(downloadKey);
     setError("");
     try {
-      const res = await fetch(
-        `${API_BASE}/api/daily-issues/export?division=${selectedDivision._id}&from=${from}&to=${to}&format=${format}${osrOnly ? "&osr=1" : ""}`,
-        { credentials: "include" }
+      const { blob, filename } = await apiDownload(
+        `/api/daily-issues/export?division=${selectedDivision._id}&from=${from}&to=${to}&format=${format}${osrOnly ? "&osr=1" : ""}`
       );
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || "Download failed");
-      }
-      const blob = await res.blob();
-      const disposition = res.headers.get("Content-Disposition") || "";
-      const match = disposition.match(/filename="([^"]+)"/);
-      const filename = match ? match[1] : `${osrOnly ? "osrs" : "issues"}-${from}-to-${to}.${format}`;
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;

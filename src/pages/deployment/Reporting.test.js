@@ -1,6 +1,6 @@
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
-import { apiGet } from "../../api/client";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { apiDownload, apiGet } from "../../api/client";
 import Reporting from "./Reporting";
 
 vi.mock("react-router-dom", () => {
@@ -12,7 +12,7 @@ vi.mock("react-router-dom", () => {
   return { useOutletContext: () => ({ selectedDivision }) };
 });
 
-vi.mock("../../api/client", () => ({ apiGet: vi.fn(), API_BASE: "" }));
+vi.mock("../../api/client", () => ({ apiDownload: vi.fn(), apiGet: vi.fn() }));
 
 vi.mock("../../components/MetricCard", () => ({
   default: function MockMetricCard({ label, value, tone }) {
@@ -111,4 +111,32 @@ test("Reporting summarizes processed OSRs and shows their daily schedule details
   expect(screen.getByTestId("metric-OSR Service Days")).toHaveTextContent("2");
   expect(screen.getAllByText("Approved maintenance request").length).toBeGreaterThan(0);
   expect(screen.getByText("BUS-10")).toBeInTheDocument();
+});
+
+test("Reporting exports use the authenticated download client", async () => {
+  apiGet.mockReset();
+  apiGet.mockImplementation((url) => {
+    if (url.startsWith("/api/daily-issues/report")) return Promise.resolve({ issues: osrIssues });
+    if (url.startsWith("/api/run-cut-days")) return Promise.resolve({ runCutDays: [] });
+    return Promise.reject(new Error(`Unexpected request: ${url}`));
+  });
+  apiDownload.mockResolvedValue({ blob: new Blob(["csv"]), filename: "issues.csv" });
+  const createObjectURL = vi.spyOn(window.URL, "createObjectURL").mockReturnValue("blob:issues");
+  const revokeObjectURL = vi.spyOn(window.URL, "revokeObjectURL").mockImplementation(() => {});
+  const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+  render(<Reporting />);
+
+  const downloadButton = screen.getByRole("button", { name: "Download Issues CSV" });
+  await waitFor(() => expect(downloadButton).toBeEnabled());
+  fireEvent.click(downloadButton);
+
+  expect(apiDownload).toHaveBeenCalledWith(expect.stringMatching(
+    /^\/api\/daily-issues\/export\?division=division-1&from=\d{4}-\d{2}-\d{2}&to=\d{4}-\d{2}-\d{2}&format=csv$/
+  ));
+  await waitFor(() => expect(downloadButton).toBeEnabled());
+
+  createObjectURL.mockRestore();
+  revokeObjectURL.mockRestore();
+  click.mockRestore();
 });

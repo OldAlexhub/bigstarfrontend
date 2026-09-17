@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { apiGet, API_BASE } from "../api/client";
+import { apiDownload, apiGet } from "../api/client";
 import { toISODate, addDays, todayInTimezone } from "../utils/dates";
 import { useLatestRequest } from "../hooks/useLatestRequest";
 import MetricCard from "../components/MetricCard";
@@ -49,15 +49,7 @@ const Leaderboard = () => {
     setDownloading(true);
     setError("");
     try {
-      const res = await fetch(`${API_BASE}/api/leaderboard/export?from=${from}&to=${to}`, { credentials: "include" });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.message || "Download failed");
-      }
-      const blob = await res.blob();
-      const disposition = res.headers.get("Content-Disposition") || "";
-      const match = disposition.match(/filename="([^"]+)"/);
-      const filename = match ? match[1] : `Leaderboard-${from}-to-${to}.pdf`;
+      const { blob, filename } = await apiDownload(`/api/leaderboard/export?from=${from}&to=${to}`);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
