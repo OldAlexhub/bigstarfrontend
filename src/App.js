@@ -28,6 +28,7 @@ import NetworkPerformance from "./pages/network-success/NetworkPerformance";
 import EmailTemplates from "./pages/network-success/EmailTemplates";
 import LdHelper from "./pages/network-success/LdHelper";
 import TuiHelper from "./pages/network-success/TuiHelper";
+import NetworkResourcesLayout, { NetworkResourcesHome } from "./pages/network-success/NetworkResourcesLayout";
 import ReallocationRequests from "./pages/network-success/ReallocationRequests";
 import CustomerServiceLayout from "./pages/customer-service/CustomerServiceLayout";
 import CustomerServiceEntries from "./pages/customer-service/CustomerServiceEntries";
@@ -92,9 +93,15 @@ function App() {
             <Route path="performance" element={allow("network_success.performance", <NetworkPerformance />)} />
             <Route path="reallocation-requests" element={allow("network_success.reallocation_requests", <ReallocationRequests />)} />
             <Route path="posts" element={allow("network_success.posts", <NetworkSuccessPosts />)} />
-            <Route path="email-templates" element={allow("network_success.email_templates", <EmailTemplates />)} />
-            <Route path="ld-helper" element={allow("network_success.ld_helper", <LdHelper />)} />
-            <Route path="tui-helper" element={allow("network_success.tui_helper", <TuiHelper />)} />
+            <Route path="resources" element={<NetworkResourcesLayout />}>
+              <Route index element={<NetworkResourcesHome />} />
+              <Route path="email-templates" element={allow("network_success.email_templates", <EmailTemplates />)} />
+              <Route path="ld-helper" element={allow("network_success.ld_helper", <LdHelper />)} />
+              <Route path="tui-helper" element={allow("network_success.tui_helper", <TuiHelper />)} />
+            </Route>
+            <Route path="email-templates" element={<Navigate to="/network-success/resources/email-templates" replace />} />
+            <Route path="ld-helper" element={<Navigate to="/network-success/resources/ld-helper" replace />} />
+            <Route path="tui-helper" element={<Navigate to="/network-success/resources/tui-helper" replace />} />
           </Route>
           <Route path="/customer-service" element={<CustomerServiceLayout />}>
             <Route index element={allow("customer_service.monthly_counts", <CustomerServiceEntries />)} />

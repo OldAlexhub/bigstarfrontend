@@ -2,6 +2,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { apiGet, apiPost } from "../../api/client";
 import DriversRoster from "./DriversRoster";
 
+const permission = vi.hoisted(() => ({ canWrite: true }));
+
 vi.mock("react-router-dom", () => {
   const division = { _id: "division-1", name: "East" };
   const context = { divisions: [division], selectedDivision: division, isAllDivisions: false };
@@ -13,6 +15,12 @@ vi.mock("../../api/client", () => ({
   apiPatch: vi.fn(),
   apiPost: vi.fn(),
 }));
+vi.mock("../../components/PageAccessRoute", () => ({ usePagePermission: () => permission }));
+
+beforeEach(() => {
+  permission.canWrite = true;
+  vi.clearAllMocks();
+});
 
 test("adds a division-owned driver with a reusable pullout address", async () => {
   apiGet.mockResolvedValue({ operators: [] });
@@ -39,4 +47,25 @@ test("adds a division-owned driver with a reusable pullout address", async () =>
     active: true,
   })));
   expect(await screen.findByText("Jane Doe")).toBeInTheDocument();
+});
+
+test("read-only Drivers access hides add and row actions", async () => {
+  permission.canWrite = false;
+  apiGet.mockResolvedValue({
+    operators: [{
+      _id: "operator-1",
+      name: "Jane Doe",
+      pulloutAddress: "100 Depot Way",
+      division: { _id: "division-1", name: "East" },
+      active: true,
+    }],
+  });
+
+  render(<DriversRoster />);
+
+  expect(await screen.findByText("Jane Doe")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "+ Add Driver" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
+  expect(apiPost).not.toHaveBeenCalled();
 });

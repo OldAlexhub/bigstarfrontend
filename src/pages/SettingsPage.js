@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { apiGet, apiPatch, apiPut } from "../api/client";
+import { apiDelete, apiGet, apiPatch, apiPut } from "../api/client";
 import { TIMEZONES } from "../utils/dates";
 
 const inputClasses =
@@ -119,6 +119,8 @@ const SettingsPage = () => {
   const [error, setError] = useState("");
   const [savedMessage, setSavedMessage] = useState("");
   const [lifecycleBusyId, setLifecycleBusyId] = useState("");
+  const [confirmation, setConfirmation] = useState(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
 
   const load = () => {
     const divisionsPath = isELT ? "/api/divisions?includeInactive=1" : "/api/divisions";
@@ -165,9 +167,18 @@ const SettingsPage = () => {
     setDivisions((prev) => prev.map((d) => (d._id === id ? { ...d, timezone: value } : d)));
   };
 
+  const handleDivisionNameChange = (id, value) => {
+    setDivisions((prev) => prev.map((d) => (d._id === id ? { ...d, name: value } : d)));
+  };
+
   const handleDivisionSave = async (division) => {
+    if (isELT && !division.name.trim()) {
+      setError("Division name is required.");
+      return;
+    }
     try {
       const data = await apiPatch(`/api/divisions/${division._id}`, {
+        ...(isELT ? { name: division.name.trim() } : {}),
         thresholds: {
           breakMinutes:
             division.thresholds.breakMinutes === "" || division.thresholds.breakMinutes === null
@@ -190,12 +201,14 @@ const SettingsPage = () => {
   const handleDivisionLifecycleChange = async (division) => {
     const restoring = division.active === false;
     if (!restoring) {
-      const confirmed = window.confirm(
-        `Retire ${division.name || division.code}? It will disappear from every operational area, but all historical data will be preserved.`
-      );
-      if (!confirmed) return;
+      setConfirmation({ type: "retire", division });
+      return;
     }
 
+    await changeDivisionLifecycle(division, true);
+  };
+
+  const changeDivisionLifecycle = async (division, restoring) => {
     setLifecycleBusyId(division._id);
     setError("");
     try {
@@ -205,6 +218,32 @@ const SettingsPage = () => {
       );
       setSavedMessage(restoring ? "Division restored" : "Division retired; historical data was preserved");
       setTimeout(() => setSavedMessage(""), 2500);
+      setConfirmation(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLifecycleBusyId("");
+    }
+  };
+
+  const requestDivisionDelete = (division) => {
+    setDeleteConfirmation("");
+    setConfirmation({ type: "delete", division });
+  };
+
+  const handleDivisionDelete = async () => {
+    const division = confirmation?.division;
+    if (!division || confirmation.type !== "delete" || deleteConfirmation !== division.code) return;
+
+    setLifecycleBusyId(division._id);
+    setError("");
+    try {
+      await apiDelete(`/api/divisions/${division._id}`, { confirmationCode: deleteConfirmation });
+      setDivisions((current) => current.filter((item) => item._id !== division._id));
+      setSavedMessage(`${division.name || division.code} was permanently deleted`);
+      setTimeout(() => setSavedMessage(""), 2500);
+      setConfirmation(null);
+      setDeleteConfirmation("");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -307,7 +346,7 @@ const SettingsPage = () => {
       <div className="rounded-xl border border-slate-200 bg-white p-6">
         <h2 className="mb-2 text-sm font-semibold text-slate-900">Division settings and lifecycle</h2>
         <p className="mb-4 text-xs text-slate-400">
-          Leave overrides blank to use company defaults. Retiring a division hides it throughout the site and stops future automated processing without deleting its history.
+          Leave overrides blank to use company defaults. Retiring preserves history; permanent deletion removes the division and all of its records.
         </p>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 text-sm">
@@ -325,8 +364,18 @@ const SettingsPage = () => {
               {displayedDivisions.map((d) => (
                 <tr key={d._id} className={d.active === false ? "bg-slate-50 opacity-75" : ""}>
                   <td className="px-3 py-2 font-medium text-slate-900">
-                    {d.code}
-                    <span className="ml-2 text-xs font-normal text-slate-400">{d.name}</span>
+                    <span className="block text-xs text-slate-400">{d.code}</span>
+                    {isELT ? (
+                      <input
+                        aria-label={`Division name for ${d.code}`}
+                        value={d.name}
+                        disabled={d.active === false}
+                        onChange={(event) => handleDivisionNameChange(d._id, event.target.value)}
+                        className="mt-1 block min-w-56 rounded-md border border-slate-300 px-2 py-1.5 text-sm font-normal text-slate-900 disabled:bg-slate-100"
+                      />
+                    ) : (
+                      <span className="mt-1 block text-sm font-medium text-slate-900">{d.name}</span>
+                    )}
                   </td>
                   <td className="px-3 py-2">
                     <input
@@ -378,18 +427,26 @@ const SettingsPage = () => {
                       >
                         Save
                       </button>
-                      {isELT && (
-                        <button
-                          type="button"
-                          onClick={() => handleDivisionLifecycleChange(d)}
-                          disabled={lifecycleBusyId === d._id}
-                          className={`text-xs font-medium hover:underline disabled:opacity-50 ${
-                            d.active === false ? "text-emerald-600" : "text-amber-700"
-                          }`}
-                        >
-                          {lifecycleBusyId === d._id ? "Saving…" : d.active === false ? "Restore" : "Retire"}
-                        </button>
-                      )}
+                      {isELT && <>
+                          <button
+                            type="button"
+                            onClick={() => handleDivisionLifecycleChange(d)}
+                            disabled={lifecycleBusyId === d._id}
+                            className={`text-xs font-medium hover:underline disabled:opacity-50 ${
+                              d.active === false ? "text-emerald-600" : "text-amber-700"
+                            }`}
+                          >
+                            {lifecycleBusyId === d._id ? "Saving…" : d.active === false ? "Restore" : "Retire"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => requestDivisionDelete(d)}
+                            disabled={lifecycleBusyId === d._id}
+                            className="text-xs font-medium text-red-600 hover:underline disabled:opacity-50"
+                          >
+                            Delete
+                          </button>
+                        </>}
                     </div>
                   </td>
                 </tr>
@@ -400,6 +457,87 @@ const SettingsPage = () => {
       </div>
 
       {isELT && <OperationsKpiSettings divisions={activeDivisions} />}
+
+      {confirmation && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-sm"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !lifecycleBusyId) setConfirmation(null);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="division-confirmation-title"
+            aria-describedby="division-confirmation-description"
+            className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+          >
+            <div className="flex items-start gap-4 p-6">
+              <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${
+                confirmation.type === "delete" ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-700"
+              }`}>
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-6 w-6" stroke="currentColor" strokeWidth="1.8">
+                  {confirmation.type === "delete" ? (
+                    <path d="M4 7h16M9 7V4h6v3m-9 0 1 13h10l1-13M10 11v5m4-5v5" strokeLinecap="round" strokeLinejoin="round" />
+                  ) : (
+                    <path d="M12 9v4m0 4h.01M10.3 4.2 2.8 17.1A2 2 0 0 0 4.5 20h15a2 2 0 0 0 1.7-2.9L13.7 4.2a2 2 0 0 0-3.4 0Z" strokeLinecap="round" strokeLinejoin="round" />
+                  )}
+                </svg>
+              </div>
+              <div className="min-w-0 flex-1">
+                <h2 id="division-confirmation-title" className="text-lg font-semibold text-slate-900">
+                  {confirmation.type === "delete" ? "Permanently delete division?" : "Retire this division?"}
+                </h2>
+                <p id="division-confirmation-description" className="mt-1 text-sm leading-6 text-slate-600">
+                  <span className="font-semibold text-slate-900">{confirmation.division.name}</span>
+                  {` (${confirmation.division.code})`}
+                  {confirmation.type === "delete"
+                    ? " and every associated operational and historical record will be permanently deleted. This cannot be undone."
+                    : " will disappear from operational areas and future automated processing will stop. All historical data will remain available."}
+                </p>
+                {confirmation.type === "delete" && (
+                  <label className="mt-4 block text-sm font-medium text-slate-700">
+                    Type <span className="font-mono font-semibold text-slate-900">{confirmation.division.code}</span> to confirm
+                    <input
+                      autoFocus
+                      value={deleteConfirmation}
+                      onChange={(event) => setDeleteConfirmation(event.target.value)}
+                      className="mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                    />
+                  </label>
+                )}
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 border-t border-slate-200 bg-slate-50 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setConfirmation(null)}
+                disabled={Boolean(lifecycleBusyId)}
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => confirmation.type === "delete"
+                  ? handleDivisionDelete()
+                  : changeDivisionLifecycle(confirmation.division, false)}
+                disabled={Boolean(lifecycleBusyId) || (
+                  confirmation.type === "delete" && deleteConfirmation !== confirmation.division.code
+                )}
+                className={`rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 ${
+                  confirmation.type === "delete" ? "bg-red-600 hover:bg-red-700" : "bg-amber-600 hover:bg-amber-700"
+                }`}
+              >
+                {lifecycleBusyId
+                  ? confirmation.type === "delete" ? "Deleting…" : "Retiring…"
+                  : confirmation.type === "delete" ? "Permanently delete" : "Retire division"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

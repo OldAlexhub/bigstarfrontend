@@ -4,6 +4,8 @@ import { apiGet, API_BASE } from "../api/client";
 import { toISODate, addDays, todayInTimezone } from "../utils/dates";
 import { useLatestRequest } from "../hooks/useLatestRequest";
 import MetricCard from "../components/MetricCard";
+import { useAuth } from "../context/AuthContext";
+import { canAccessPage } from "../config/pageAccess";
 
 const pct = (v) => (v == null ? "—" : `${Math.round(v * 1000) / 10}%`);
 const num = (v) => (v == null ? "—" : v);
@@ -11,6 +13,8 @@ const num = (v) => (v == null ? "—" : v);
 const RANK_MEDALS = { 1: "🥇", 2: "🥈", 3: "🥉" };
 
 const Leaderboard = () => {
+  const { user } = useAuth();
+  const canOpenMasterRunCuts = canAccessPage(user, "master_run_cuts.run_cuts");
   // Company-wide report — no single division's timezone applies, so the
   // default range uses the company-default timezone (the range itself is
   // user-picked; this only affects the starting values), same convention
@@ -74,7 +78,13 @@ const Leaderboard = () => {
     const top = data.divisions[0];
     const totalIssues = data.divisions.reduce((s, d) => s + d.issueCount, 0);
     const totalHoursAtRisk = data.divisions.reduce((s, d) => s + (d.revenueHoursAtRisk || 0), 0);
-    return { top, totalIssues, totalHoursAtRisk: Math.round(totalHoursAtRisk * 100) / 100 };
+    return {
+      top,
+      totalIssues,
+      totalHoursAtRisk: Math.round(totalHoursAtRisk * 100) / 100,
+      totalDivisions: data.totalDivisions || data.divisions.length,
+      isCompanyWide: data.isCompanyWide ?? data.divisions.length === (data.totalDivisions || data.divisions.length),
+    };
   }, [data]);
 
   return (
@@ -82,7 +92,7 @@ const Leaderboard = () => {
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-slate-900">Leaderboard</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Every division ranked by fulfillment — run cut and revenue hour coverage, plus issues logged by Deployment —
+          Company-wide fulfillment rank for the divisions you are authorized to view, plus issues logged by Deployment,
           for any date range.
         </p>
       </div>
@@ -123,10 +133,21 @@ const Leaderboard = () => {
 
       {!loading && summary && (
         <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <MetricCard label="Top Division" value={summary.top.name} tone="good" sub={pct(summary.top.avgFulfillmentPct)} />
-          <MetricCard label="Issues Logged Company-Wide" value={num(summary.totalIssues)} tone="info" />
           <MetricCard
-            label="Revenue Hours At Risk Company-Wide"
+            label={summary.isCompanyWide ? "Top Division" : "Best Accessible Division"}
+            value={summary.top.name}
+            tone="good"
+            sub={summary.isCompanyWide
+              ? pct(summary.top.avgFulfillmentPct)
+              : `Company rank #${summary.top.rank} of ${summary.totalDivisions} · ${pct(summary.top.avgFulfillmentPct)}`}
+          />
+          <MetricCard
+            label={summary.isCompanyWide ? "Issues Logged Company-Wide" : "Issues Logged in Accessible Divisions"}
+            value={num(summary.totalIssues)}
+            tone="info"
+          />
+          <MetricCard
+            label={summary.isCompanyWide ? "Revenue Hours At Risk Company-Wide" : "Revenue Hours At Risk in Accessible Divisions"}
             value={num(summary.totalHoursAtRisk)}
             tone={summary.totalHoursAtRisk > 0 ? "warning" : "neutral"}
           />
@@ -167,9 +188,11 @@ const Leaderboard = () => {
                     {RANK_MEDALS[d.rank] || d.rank}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2 font-medium text-slate-900">
-                    <Link to={`/master-run-cuts?division=${d.divisionId}`} className="hover:underline">
-                      {d.name}
-                    </Link>
+                    {canOpenMasterRunCuts ? (
+                      <Link to={`/master-run-cuts?division=${d.divisionId}`} className="hover:underline">
+                        {d.name}
+                      </Link>
+                    ) : d.name}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2 text-slate-600">{pct(d.runCutFulfillmentPct)}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-slate-600">{pct(d.revenueHourFulfillmentPct)}</td>

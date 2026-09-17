@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { apiDelete, apiGet, apiPatch, apiPost } from "../../api/client";
 import { useLatestRequest } from "../../hooks/useLatestRequest";
+import { usePagePermission } from "../../components/PageAccessRoute";
 
 const VehiclesRoster = () => {
   const { divisions, selectedDivision, isAllDivisions } = useOutletContext();
+  const { canWrite } = usePagePermission();
   const [vehicles, setVehicles] = useState([]);
   const [form, setForm] = useState({ code: "", division: "" });
   const [editingId, setEditingId] = useState("");
@@ -43,7 +45,7 @@ const VehiclesRoster = () => {
 
   const addVehicle = async (event) => {
     event.preventDefault();
-    if (!form.code.trim() || !form.division) return;
+    if (!canWrite || !form.code.trim() || !form.division) return;
     setSaving(true);
     setError("");
     try {
@@ -59,6 +61,7 @@ const VehiclesRoster = () => {
   };
 
   const saveVehicle = async (vehicle) => {
+    if (!canWrite) return;
     setSaving(true);
     setError("");
     try {
@@ -73,6 +76,7 @@ const VehiclesRoster = () => {
   };
 
   const removeVehicle = async (vehicle) => {
+    if (!canWrite) return;
     if (!window.confirm(`Remove vehicle ${vehicle.code} from the roster?`)) return;
     setError("");
     try {
@@ -95,14 +99,16 @@ const VehiclesRoster = () => {
           <h2 className="text-lg font-semibold text-slate-900">Vehicles roster</h2>
           <p className="mt-1 text-sm text-slate-500">Only vehicles in the selected division appear in assignment lists.</p>
         </div>
-        <button type="button" onClick={() => setShowAdd((value) => !value)} className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100">
-          {showAdd ? "Cancel" : "+ Add Vehicle"}
-        </button>
+        {canWrite && (
+          <button type="button" onClick={() => setShowAdd((value) => !value)} className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100">
+            {showAdd ? "Cancel" : "+ Add Vehicle"}
+          </button>
+        )}
       </div>
 
       {error && <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
 
-      {showAdd && (
+      {canWrite && showAdd && (
         <form onSubmit={addVehicle} className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4">
           <label className="text-sm text-slate-600">
             Vehicle number
@@ -120,10 +126,10 @@ const VehiclesRoster = () => {
 
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
         <table className="min-w-full divide-y divide-slate-200 text-sm">
-          <thead className="bg-slate-50"><tr>{["Vehicle Number", "Division", "Actions"].map((heading) => <th key={heading} className="px-3 py-2 text-left font-medium text-slate-500">{heading}</th>)}</tr></thead>
+          <thead className="bg-slate-50"><tr>{["Vehicle Number", "Division", ...(canWrite ? ["Actions"] : [])].map((heading) => <th key={heading} className="px-3 py-2 text-left font-medium text-slate-500">{heading}</th>)}</tr></thead>
           <tbody className="divide-y divide-slate-100">
-            {loading && <tr><td colSpan={3} className="px-3 py-6 text-center text-slate-400">Loading vehicles…</td></tr>}
-            {!loading && sortedVehicles.length === 0 && <tr><td colSpan={3} className="px-3 py-6 text-center text-slate-400">No vehicles in this roster yet.</td></tr>}
+            {loading && <tr><td colSpan={canWrite ? 3 : 2} className="px-3 py-6 text-center text-slate-400">Loading vehicles…</td></tr>}
+            {!loading && sortedVehicles.length === 0 && <tr><td colSpan={canWrite ? 3 : 2} className="px-3 py-6 text-center text-slate-400">No vehicles in this roster yet.</td></tr>}
             {!loading && sortedVehicles.map((vehicle) => {
               const editing = editingId === vehicle._id;
               return (
@@ -132,9 +138,9 @@ const VehiclesRoster = () => {
                   <td className="px-3 py-2 text-slate-600">
                     {editing && isAllDivisions ? <select value={draft.division} onChange={(event) => setDraft({ ...draft, division: event.target.value })} className="rounded-md border border-slate-300 bg-white px-2 py-1">{divisions.map((division) => <option key={division._id} value={division._id}>{division.name}</option>)}</select> : vehicle.division?.name || vehicle.division?.code || "—"}
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2">
+                  {canWrite && <td className="whitespace-nowrap px-3 py-2">
                     {editing ? <><button type="button" onClick={() => saveVehicle(vehicle)} disabled={saving} className="mr-3 text-sm font-medium text-brand-700 hover:underline">Save</button><button type="button" onClick={() => setEditingId("")} className="text-sm text-slate-500 hover:underline">Cancel</button></> : <><button type="button" onClick={() => { setEditingId(vehicle._id); setDraft({ code: vehicle.code, division: vehicle.division?._id || vehicle.division }); }} className="mr-3 text-sm font-medium text-brand-700 hover:underline">Edit</button><button type="button" onClick={() => removeVehicle(vehicle)} className="text-sm font-medium text-red-600 hover:underline">Remove</button></>}
-                  </td>
+                  </td>}
                 </tr>
               );
             })}

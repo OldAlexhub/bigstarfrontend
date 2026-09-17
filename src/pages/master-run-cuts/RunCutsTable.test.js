@@ -2,10 +2,17 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { apiDelete, apiGet, apiPatch, apiPost } from "../../api/client";
 import RunCutsTable from "./RunCutsTable";
 
+const permission = vi.hoisted(() => ({ canWrite: true }));
+const outletContext = vi.hoisted(() => ({
+  selectedDivision: { _id: "division-1", code: "D1", name: "Division One" },
+  isAllDivisions: false,
+}));
+
 vi.mock("react-router-dom", () => ({
-  useOutletContext: () => ({ selectedDivision: { _id: "division-1", code: "D1", name: "Division One" }, isAllDivisions: false }),
+  useOutletContext: () => outletContext,
 }));
 vi.mock("../../api/client", () => ({ apiDelete: vi.fn(), apiGet: vi.fn(), apiPatch: vi.fn(), apiPost: vi.fn() }));
+vi.mock("../../components/PageAccessRoute", () => ({ usePagePermission: () => permission }));
 
 const runCut = {
   _id: "run-cut-1",
@@ -22,6 +29,8 @@ const runCut = {
 };
 
 beforeEach(() => {
+  permission.canWrite = true;
+  vi.clearAllMocks();
   apiGet.mockImplementation((path) => {
     if (path.startsWith("/api/run-cuts")) return Promise.resolve({ runCuts: [runCut] });
     if (path.startsWith("/api/operators")) return Promise.resolve({ operators: [] });
@@ -49,4 +58,19 @@ test("new STBY-labeled routes become standby and existing routes can be removed"
   await waitFor(() => expect(apiDelete).toHaveBeenCalledWith("/api/routes/route-1"));
   expect(confirm).toHaveBeenCalledWith(expect.stringContaining("past history will be kept"));
   confirm.mockRestore();
+});
+
+test("read-only Run Cuts renders values without editing controls", async () => {
+  permission.canWrite = false;
+  render(<RunCutsTable />);
+
+  expect(await screen.findByText("R1")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "+ Add Route" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("Driver for R1")).not.toBeInTheDocument();
+  expect(screen.getByText("Active")).toBeInTheDocument();
+  expect(apiGet).toHaveBeenCalledTimes(1);
+  expect(apiPatch).not.toHaveBeenCalled();
+  expect(apiPost).not.toHaveBeenCalled();
+  expect(apiDelete).not.toHaveBeenCalled();
 });

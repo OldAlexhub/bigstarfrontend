@@ -78,7 +78,10 @@ export const apiPatch = (path, body) => request(path, { method: "PATCH", body: J
 
 export const apiPut = (path, body) => request(path, { method: "PUT", body: JSON.stringify(body) });
 
-export const apiDelete = (path) => request(path, { method: "DELETE" });
+export const apiDelete = (path, body) => request(path, {
+  method: "DELETE",
+  ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+});
 
 export const apiDownload = async (path) => {
   const headers = new Headers();

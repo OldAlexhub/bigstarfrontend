@@ -1,6 +1,9 @@
+import { createContext, useContext } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { canAccessPage, firstAccessiblePath } from "../config/pageAccess";
+import { canAccessPage, canWritePage, firstAccessiblePath, pageAccessLevel } from "../config/pageAccess";
+
+const PagePermissionContext = createContext({ permission: null, accessLevel: null, canWrite: false });
 
 const AccessDenied = () => {
   const { user } = useAuth();
@@ -23,8 +26,23 @@ const AccessDenied = () => {
 
 const PageAccessRoute = ({ permission, children }) => {
   const { user } = useAuth();
-  return canAccessPage(user, permission) ? children : <AccessDenied />;
+  if (!canAccessPage(user, permission)) return <AccessDenied />;
+
+  const accessLevel = pageAccessLevel(user, permission);
+  const canWrite = canWritePage(user, permission);
+  return (
+    <PagePermissionContext.Provider value={{ permission, accessLevel, canWrite }}>
+      {!canWrite && (
+        <div className="mb-4 rounded-lg border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm text-sky-800" role="status">
+          <span className="font-semibold">Read-only access.</span> You can view, filter, and export this page, but changes are blocked.
+        </div>
+      )}
+      {children}
+    </PagePermissionContext.Provider>
+  );
 };
+
+export const usePagePermission = () => useContext(PagePermissionContext);
 
 export { AccessDenied };
 export default PageAccessRoute;

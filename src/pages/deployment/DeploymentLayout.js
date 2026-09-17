@@ -38,9 +38,10 @@ const DeploymentLayout = () => {
   const [postCount, setPostCount] = useState(0);
   const [postByDivision, setPostByDivision] = useState({});
   const [searchParams, setSearchParams] = useSearchParams();
+  const canViewPosts = canAccessPage(user, "deployment.posts");
+  const canViewReceivingRequests = canAccessPage(user, "deployment.receiving_requests");
 
   useEffect(() => {
-    if (!canAccessPage(user, "deployment.posts")) return undefined;
     let cancelled = false;
     apiGet("/api/divisions")
       .then((data) => {
@@ -62,12 +63,12 @@ const DeploymentLayout = () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user?.id]);
 
   const postCountRef = useRef(null);
 
   useEffect(() => {
-    if (!canAccessPage(user, "deployment.receiving_requests")) return undefined;
+    if (!canViewPosts) return undefined;
     let cancelled = false;
     const loadPostCount = () => {
       apiGet("/api/team-posts/notifications?section=deployment")
@@ -95,13 +96,14 @@ const DeploymentLayout = () => {
       window.removeEventListener(TEAM_POST_UPDATED_EVENT, loadPostCount);
       clearTabNotificationCount("deployment-posts");
     };
-  }, [user]);
+  }, [user?.id, canViewPosts]);
 
   const selectedDivision = divisions.find((d) => d._id === selectedDivisionId) || null;
 
   const pendingRequestCountRef = useRef(null);
 
   useEffect(() => {
+    if (!canViewReceivingRequests) return undefined;
     let cancelled = false;
     const loadPendingCount = () => {
       apiGet("/api/reallocation-requests/pending-notifications")
@@ -129,7 +131,7 @@ const DeploymentLayout = () => {
       window.removeEventListener(REALLOCATION_UPDATED_EVENT, loadPendingCount);
       clearTabNotificationCount("deployment-requests");
     };
-  }, []);
+  }, [user?.id, canViewReceivingRequests]);
 
   const handleSelectDivision = (id) => {
     setSelectedDivisionId(id);

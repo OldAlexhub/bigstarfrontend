@@ -2,7 +2,12 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiGet, apiPost, apiPatch, apiDelete } from "../api/client";
 import { useAuth } from "../context/AuthContext";
-import { effectivePageAccess, PAGE_ACCESS_GROUPS, PAGE_ACCESS_KEYS } from "../config/pageAccess";
+import {
+  effectivePageAccess,
+  effectivePageAccessLevels,
+  PAGE_ACCESS_GROUPS,
+  PAGE_ACCESS_KEYS,
+} from "../config/pageAccess";
 
 const ROLES = ["ELT", "VP", "Director", "Sr Manager", "Manager", "Coordinator"];
 const emptyForm = {
@@ -15,6 +20,7 @@ const emptyForm = {
   department: "",
   role: "Coordinator",
   pageAccess: [],
+  pageAccessLevels: {},
   divisionAccess: [],
 };
 
@@ -23,19 +29,50 @@ const inputClasses =
 
 const UserForm = ({ form, setForm, divisions, isEdit, onSubmit, onCancel, submitting, error }) => {
   const togglePage = (key) => {
-    setForm((f) => ({
-      ...f,
-      pageAccess: f.pageAccess.includes(key) ? f.pageAccess.filter((page) => page !== key) : [...f.pageAccess, key],
-    }));
+    setForm((f) => {
+      const isSelected = f.pageAccess.includes(key);
+      const pageAccessLevels = { ...f.pageAccessLevels };
+      if (isSelected) delete pageAccessLevels[key];
+      else pageAccessLevels[key] = "read";
+      return {
+        ...f,
+        pageAccess: isSelected ? f.pageAccess.filter((page) => page !== key) : [...f.pageAccess, key],
+        pageAccessLevels,
+      };
+    });
   };
   const setGroupAccess = (pages, enabled) => {
     const keys = pages.map((page) => page.key);
+    setForm((f) => {
+      const pageAccessLevels = { ...f.pageAccessLevels };
+      keys.forEach((key) => {
+        if (enabled) pageAccessLevels[key] ||= "read";
+        else delete pageAccessLevels[key];
+      });
+      return {
+        ...f,
+        pageAccess: enabled
+          ? [...new Set([...f.pageAccess, ...keys])]
+          : f.pageAccess.filter((page) => !keys.includes(page)),
+        pageAccessLevels,
+      };
+    });
+  };
+  const setPageAccessLevel = (key, level) => {
     setForm((f) => ({
       ...f,
-      pageAccess: enabled
-        ? [...new Set([...f.pageAccess, ...keys])]
-        : f.pageAccess.filter((page) => !keys.includes(page)),
+      pageAccessLevels: { ...f.pageAccessLevels, [key]: level },
     }));
+  };
+  const selectAllPages = () => {
+    setForm((f) => ({
+      ...f,
+      pageAccess: [...PAGE_ACCESS_KEYS],
+      pageAccessLevels: Object.fromEntries(PAGE_ACCESS_KEYS.map((key) => [key, "read"])),
+    }));
+  };
+  const clearAllPages = () => {
+    setForm((f) => ({ ...f, pageAccess: [], pageAccessLevels: {} }));
   };
   const toggleDivision = (id) => {
     setForm((f) => ({
@@ -115,14 +152,14 @@ const UserForm = ({ form, setForm, divisions, isEdit, onSubmit, onCancel, submit
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h3 className="text-sm font-semibold text-slate-800">Site and tab access</h3>
-            <p className="mt-0.5 text-xs text-slate-500">Choose each page this user can open. Unchecked pages stay hidden and are blocked by direct URL.</p>
+            <p className="mt-0.5 text-xs text-slate-500">Choose each page this user can open, then assign read-only or read-and-write access.</p>
           </div>
           <div className="flex gap-2">
-            <button type="button" disabled={form.role === "ELT"} onClick={() => setForm((f) => ({ ...f, pageAccess: [...PAGE_ACCESS_KEYS] }))} className="text-xs font-medium text-brand-700 hover:underline disabled:text-slate-400">Select all</button>
-            <button type="button" disabled={form.role === "ELT"} onClick={() => setForm((f) => ({ ...f, pageAccess: [] }))} className="text-xs font-medium text-slate-600 hover:underline disabled:text-slate-400">Clear all</button>
+            <button type="button" disabled={form.role === "ELT"} onClick={selectAllPages} className="text-xs font-medium text-brand-700 hover:underline disabled:text-slate-400">Select all (read only)</button>
+            <button type="button" disabled={form.role === "ELT"} onClick={clearAllPages} className="text-xs font-medium text-slate-600 hover:underline disabled:text-slate-400">Clear all</button>
           </div>
         </div>
-        {form.role === "ELT" && <p className="mt-3 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-700">ELT automatically has access to every site page and division.</p>}
+        {form.role === "ELT" && <p className="mt-3 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-700">ELT automatically has read-and-write access to every site page and division.</p>}
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {PAGE_ACCESS_GROUPS.map((group) => {
             const allSelected = group.pages.every((page) => form.pageAccess.includes(page.key));
@@ -135,15 +172,34 @@ const UserForm = ({ form, setForm, divisions, isEdit, onSubmit, onCancel, submit
                   </button>
                 </div>
                 <div className="space-y-1.5">
-                  {group.pages.map((page) => (
-                    <label key={page.key} className="flex items-start gap-2 text-sm text-slate-600">
-                      <input type="checkbox" className="mt-0.5" checked={form.pageAccess.includes(page.key)} onChange={() => togglePage(page.key)} />
-                      <span>
-                        <span className="block">{page.label}</span>
-                        {page.description && <span className="mt-0.5 block text-xs leading-4 text-slate-400">{page.description}</span>}
-                      </span>
-                    </label>
-                  ))}
+                  {group.pages.map((page) => {
+                    const selected = form.pageAccess.includes(page.key);
+                    return (
+                      <div key={page.key} className="flex items-start gap-2 rounded-md py-1 text-sm text-slate-600">
+                        <input
+                          type="checkbox"
+                          aria-label={page.label}
+                          className="mt-2"
+                          checked={selected}
+                          onChange={() => togglePage(page.key)}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <span className="block">{page.label}</span>
+                          {page.description && <span className="mt-0.5 block text-xs leading-4 text-slate-400">{page.description}</span>}
+                        </div>
+                        <select
+                          aria-label={`${page.label} access level`}
+                          value={form.pageAccessLevels?.[page.key] || "read"}
+                          onChange={(event) => setPageAccessLevel(page.key, event.target.value)}
+                          disabled={!selected}
+                          className="rounded-md border border-slate-300 bg-white px-1.5 py-1 text-xs text-slate-700 disabled:bg-slate-100 disabled:text-slate-400"
+                        >
+                          <option value="read">Read only</option>
+                          <option value="write">Read &amp; write</option>
+                        </select>
+                      </div>
+                    );
+                  })}
                 </div>
               </fieldset>
             );
@@ -206,6 +262,8 @@ const UserAdmin = () => {
   const [editForm, setEditForm] = useState(emptyForm);
   const [editError, setEditError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [deleteCandidate, setDeleteCandidate] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -220,6 +278,22 @@ const UserAdmin = () => {
   };
 
   useEffect(load, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const refreshDivisions = () => {
+      apiGet("/api/divisions")
+        .then((data) => {
+          if (!cancelled) setDivisions(data.divisions || []);
+        })
+        .catch(() => {});
+    };
+    window.addEventListener("focus", refreshDivisions);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", refreshDivisions);
+    };
+  }, []);
 
   const handleAdd = async (e) => {
     e.preventDefault();
@@ -249,6 +323,7 @@ const UserAdmin = () => {
       department: user.department || "",
       role: user.role,
       pageAccess: effectivePageAccess(user),
+      pageAccessLevels: effectivePageAccessLevels(user),
       divisionAccess: (user.divisionAccess || []).map((d) => d._id || d),
     });
     setEditError("");
@@ -281,14 +356,18 @@ const UserAdmin = () => {
     }
   };
 
-  const handleDelete = async (user) => {
-    if (!window.confirm(`Permanently delete ${user.name} (${user.username})? This can't be undone.`)) return;
+  const handleDelete = async () => {
+    if (!deleteCandidate) return;
     setError("");
+    setDeleting(true);
     try {
-      await apiDelete(`/api/users/${user.id}`);
+      await apiDelete(`/api/users/${deleteCandidate.id}`);
+      setDeleteCandidate(null);
       load();
     } catch (err) {
       setError(err.message);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -305,7 +384,7 @@ const UserAdmin = () => {
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-slate-900">User Administration</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Add, edit, deactivate, or remove users, and control every site page, tab, and division they can access.
+          Add, edit, deactivate, or remove users, and control both page visibility and read/write access.
         </p>
         <p className="mt-2 text-sm">
           <Link to="/settings" className="text-brand-600 hover:underline">
@@ -381,7 +460,9 @@ const UserAdmin = () => {
                     <td className="whitespace-nowrap px-3 py-2 text-slate-600">{u.title || "—"}</td>
                     <td className="whitespace-nowrap px-3 py-2 text-slate-600">{u.department || "—"}</td>
                     <td className="px-3 py-2 text-slate-600">
-                      {u.role === "ELT" ? "All" : `${effectivePageAccess(u).length} of ${PAGE_ACCESS_KEYS.length}`}
+                      {u.role === "ELT"
+                        ? "All · read & write"
+                        : `${effectivePageAccess(u).length} of ${PAGE_ACCESS_KEYS.length} · ${Object.values(effectivePageAccessLevels(u)).filter((level) => level === "write").length} write`}
                     </td>
                     <td className="px-3 py-2 text-slate-600">
                       {u.role === "ELT" ? "All" : u.divisionAccess?.map((d) => d.code).join(", ") || "—"}
@@ -403,7 +484,7 @@ const UserAdmin = () => {
                         <button onClick={() => toggleActive(u)} className="text-xs font-medium text-amber-600 hover:underline">
                           {u.active ? "Deactivate" : "Activate"}
                         </button>
-                        <button onClick={() => handleDelete(u)} className="text-xs font-medium text-red-600 hover:underline">
+                        <button onClick={() => setDeleteCandidate(u)} className="text-xs font-medium text-red-600 hover:underline">
                           Delete
                         </button>
                       </div>
@@ -413,6 +494,60 @@ const UserAdmin = () => {
               )}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {deleteCandidate && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-sm"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !deleting) setDeleteCandidate(null);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-user-title"
+            aria-describedby="delete-user-description"
+            className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+          >
+            <div className="flex items-start gap-4 p-6">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-6 w-6" stroke="currentColor" strokeWidth="1.8">
+                  <path d="M4 7h16M9 7V4h6v3m-9 0 1 13h10l1-13M10 11v5m4-5v5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <h2 id="delete-user-title" className="text-lg font-semibold text-slate-900">Delete this user?</h2>
+                <p id="delete-user-description" className="mt-1 text-sm leading-6 text-slate-600">
+                  This permanently deletes <span className="font-semibold text-slate-900">{deleteCandidate.name}</span>
+                  {deleteCandidate.username ? ` (${deleteCandidate.username})` : ""}. This action cannot be undone.
+                </p>
+                <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+                  If access should only be paused, cancel and use Deactivate instead.
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 border-t border-slate-200 bg-slate-50 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setDeleteCandidate(null)}
+                disabled={deleting}
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleting ? "Deleting…" : "Permanently delete"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

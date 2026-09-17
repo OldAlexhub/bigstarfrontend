@@ -4,6 +4,7 @@ import { apiDelete, apiGet, apiPost, apiPatch } from "../../api/client";
 import RunCutDayTable from "../../components/RunCutDayTable";
 import { useLatestRequest } from "../../hooks/useLatestRequest";
 import { DAYS_OF_WEEK } from "../../utils/dates";
+import { usePagePermission } from "../../components/PageAccessRoute";
 
 const emptyNewRoute = {
   code: "",
@@ -17,6 +18,7 @@ const emptyNewRoute = {
 
 const RunCutsTable = () => {
   const { selectedDivision, isAllDivisions } = useOutletContext();
+  const { canWrite } = usePagePermission();
   const [runCuts, setRunCuts] = useState([]);
   const [operators, setOperators] = useState([]);
   const [vehicles, setVehicles] = useState([]);
@@ -57,6 +59,7 @@ const RunCutsTable = () => {
 
   useEffect(() => {
     if (!selectedDivision) return;
+    if (!canWrite) return;
     const requestId = operatorsRequest.begin();
     const url = isAllDivisions
       ? "/api/operators"
@@ -67,10 +70,11 @@ const RunCutsTable = () => {
       })
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDivision, isAllDivisions]);
+  }, [selectedDivision, isAllDivisions, canWrite]);
 
   useEffect(() => {
     if (!selectedDivision) return;
+    if (!canWrite) return;
     const requestId = vehiclesRequest.begin();
     const url = isAllDivisions ? "/api/vehicles" : `/api/vehicles?division=${selectedDivision._id}`;
     apiGet(url)
@@ -79,7 +83,7 @@ const RunCutsTable = () => {
       })
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDivision, isAllDivisions]);
+  }, [selectedDivision, isAllDivisions, canWrite]);
 
   const rows = [...runCuts].sort((a, b) => {
     if (isAllDivisions) {
@@ -92,6 +96,7 @@ const RunCutsTable = () => {
   });
 
   const handlePatch = async (runCut, patch) => {
+    if (!canWrite) return;
     setSavingId(runCut._id);
     try {
       const data = await apiPatch(`/api/run-cuts/${runCut._id}`, patch);
@@ -124,7 +129,7 @@ const RunCutsTable = () => {
 
   const handleAddRoute = async (e) => {
     e.preventDefault();
-    if (!newRoute.code.trim() || !selectedDivision) return;
+    if (!canWrite || !newRoute.code.trim() || !selectedDivision) return;
     setAddingRoute(true);
     setAddRouteError("");
     let createdRouteId = null;
@@ -157,6 +162,7 @@ const RunCutsTable = () => {
   };
 
   const handleRoutePatch = async (runCut, patch) => {
+    if (!canWrite) return;
     setSavingId(runCut._id);
     setError("");
     try {
@@ -170,6 +176,7 @@ const RunCutsTable = () => {
   };
 
   const handleDeleteRoute = async (runCut) => {
+    if (!canWrite) return;
     const routeCode = runCut.route?.code || "this route";
     if (!window.confirm(`Remove ${routeCode} from Master Run Cuts? Future scheduled days will be removed; past history will be kept.`)) return;
     setSavingId(runCut._id);
@@ -194,7 +201,7 @@ const RunCutsTable = () => {
         </p>
       )}
 
-      {!isAllDivisions && (
+      {canWrite && !isAllDivisions && (
         <div className="mb-4">
           <button
             type="button"
@@ -206,7 +213,7 @@ const RunCutsTable = () => {
         </div>
       )}
 
-      {!isAllDivisions && showAddRoute && (
+      {canWrite && !isAllDivisions && showAddRoute && (
         <form
           onSubmit={handleAddRoute}
           className="mb-4 rounded-xl border border-slate-200 bg-white p-4"
@@ -335,12 +342,13 @@ const RunCutsTable = () => {
           onPatch={handlePatch}
           emptyMessage="No routes set up for this division yet."
           showDisruptionAndNotes={false}
-          editableAssignment
+          editableAssignment={canWrite}
+          editableStatus={canWrite}
           operators={operators}
           vehicles={vehicles}
           showDivisionColumn={isAllDivisions}
-          onRoutePatch={handleRoutePatch}
-          onDeleteRoute={isAllDivisions ? undefined : handleDeleteRoute}
+          onRoutePatch={canWrite ? handleRoutePatch : undefined}
+          onDeleteRoute={canWrite && !isAllDivisions ? handleDeleteRoute : undefined}
         />
       )}
     </div>

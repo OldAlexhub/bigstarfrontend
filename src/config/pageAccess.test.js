@@ -1,6 +1,8 @@
 import {
   canAccessPage,
+  canWritePage,
   effectivePageAccess,
+  effectivePageAccessLevels,
   firstAccessiblePathForSection,
 } from "./pageAccess";
 
@@ -41,4 +43,44 @@ test("Report Builder can be granted independently to a non-ELT user", () => {
   expect(canAccessPage(user, "report_builder")).toBe(true);
   expect(canAccessPage(user, "elt_reporting.operations_report")).toBe(false);
   expect(canAccessPage(user, "leaderboard")).toBe(false);
+});
+
+test("Network Success resource permissions open their nested resource paths", () => {
+  const user = {
+    role: "Manager",
+    pageAccessConfigured: true,
+    pageAccess: ["network_success.tui_helper"],
+  };
+
+  expect(firstAccessiblePathForSection(user, "network_success"))
+    .toBe("/network-success/resources/tui-helper");
+});
+
+test("read-only access opens a page without granting write access", () => {
+  const user = {
+    role: "Manager",
+    pageAccessConfigured: true,
+    pageAccess: ["network_success.performance", "report_builder"],
+    pageAccessLevels: {
+      "network_success.performance": "read",
+      report_builder: "write",
+    },
+  };
+
+  expect(canAccessPage(user, "network_success.performance")).toBe(true);
+  expect(canWritePage(user, "network_success.performance")).toBe(false);
+  expect(canWritePage(user, "report_builder")).toBe(true);
+  expect(effectivePageAccessLevels(user)).toEqual({
+    "network_success.performance": "read",
+    report_builder: "write",
+  });
+});
+
+test("existing users without saved access levels retain write access", () => {
+  expect(canWritePage({ role: "Coordinator", sections: ["safety"] }, "safety.scores")).toBe(true);
+  expect(canWritePage({
+    role: "Coordinator",
+    pageAccessConfigured: true,
+    pageAccess: ["safety.scores"],
+  }, "safety.scores")).toBe(true);
 });

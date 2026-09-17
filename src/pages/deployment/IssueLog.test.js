@@ -23,7 +23,7 @@ vi.mock("../../api/client", () => ({
   apiDelete: vi.fn(),
 }));
 
-test("Issue Log reloads records for the selected From and To dates", async () => {
+test("read-only Issue Log reloads records without requesting editing reference data", async () => {
   apiGet.mockImplementation((url) => {
     if (url.startsWith("/api/daily-issues")) {
       const isSelectedRange = url.includes("from=2026-08-01&to=2026-08-15");
@@ -61,4 +61,8 @@ test("Issue Log reloads records for the selected From and To dates", async () =>
     )
   );
   expect(await screen.findByText("Inside selected range")).toBeInTheDocument();
+  expect(screen.queryByText("Log an issue")).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+  expect(apiGet.mock.calls.every(([url]) => url.startsWith("/api/daily-issues"))).toBe(true);
 });

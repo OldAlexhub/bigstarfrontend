@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { apiGet } from "../../api/client";
 import { REALLOCATION_UPDATED_EVENT } from "../reallocationUi";
 import { TEAM_POST_UPDATED_EVENT } from "../posts/postUi";
@@ -7,9 +7,12 @@ import { playNotificationSound } from "../../utils/notificationSound";
 import { clearTabNotificationCount, setTabNotificationCount } from "../../utils/tabNotifications";
 import { useAuth } from "../../context/AuthContext";
 import { canAccessPage } from "../../config/pageAccess";
+import { NETWORK_RESOURCE_TABS } from "./NetworkResourcesLayout";
 
 const NetworkSuccessLayout = () => {
   const { user } = useAuth();
+  const location = useLocation();
+  const firstResourcePath = NETWORK_RESOURCE_TABS.find((tab) => canAccessPage(user, tab.permission))?.path;
   const [acceptedCount, setAcceptedCount] = useState(0);
   const [postCount, setPostCount] = useState(0);
   const acceptedCountRef = useRef(null);
@@ -139,35 +142,17 @@ const NetworkSuccessLayout = () => {
           </span>
         )}
       </NavLink>}
-      {canAccessPage(user, "network_success.email_templates") && <NavLink
-        to="/network-success/email-templates"
-        className={({ isActive }) =>
+      {firstResourcePath && <NavLink
+        to={firstResourcePath}
+        className={() =>
           `inline-flex shrink-0 border-b-2 px-1 py-3 text-sm font-medium ${
-            isActive ? "border-brand-500 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-700"
+            location.pathname.startsWith("/network-success/resources")
+              ? "border-brand-500 text-brand-700"
+              : "border-transparent text-slate-500 hover:text-slate-700"
           }`
         }
       >
-        Email Templates
-      </NavLink>}
-      {canAccessPage(user, "network_success.ld_helper") && <NavLink
-        to="/network-success/ld-helper"
-        className={({ isActive }) =>
-          `inline-flex shrink-0 border-b-2 px-1 py-3 text-sm font-medium ${
-            isActive ? "border-brand-500 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-700"
-          }`
-        }
-      >
-        LD Helper
-      </NavLink>}
-      {canAccessPage(user, "network_success.tui_helper") && <NavLink
-        to="/network-success/tui-helper"
-        className={({ isActive }) =>
-          `inline-flex shrink-0 border-b-2 px-1 py-3 text-sm font-medium ${
-            isActive ? "border-brand-500 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-700"
-          }`
-        }
-      >
-        TUI Helper
+        Resources
       </NavLink>}
     </div>
     <Outlet />

@@ -40,9 +40,9 @@ export const PAGE_ACCESS_GROUPS = [
       { key: "network_success.performance", label: "Performance", path: "/network-success/performance" },
       { key: "network_success.reallocation_requests", label: "Reallocation Requests", path: "/network-success/reallocation-requests" },
       { key: "network_success.posts", label: "Posts", path: "/network-success/posts" },
-      { key: "network_success.email_templates", label: "Email Templates", path: "/network-success/email-templates" },
-      { key: "network_success.ld_helper", label: "LD Helper", path: "/network-success/ld-helper" },
-      { key: "network_success.tui_helper", label: "TUI Helper", path: "/network-success/tui-helper" },
+      { key: "network_success.email_templates", label: "Email Templates", path: "/network-success/resources/email-templates" },
+      { key: "network_success.ld_helper", label: "LD Helper", path: "/network-success/resources/ld-helper" },
+      { key: "network_success.tui_helper", label: "TUI Helper", path: "/network-success/resources/tui-helper" },
     ],
   },
   {
@@ -90,6 +90,7 @@ export const PAGE_ACCESS_GROUPS = [
 
 export const PAGE_ACCESS_PAGES = PAGE_ACCESS_GROUPS.flatMap((group) => group.pages);
 export const PAGE_ACCESS_KEYS = PAGE_ACCESS_PAGES.map((page) => page.key);
+export const PAGE_ACCESS_LEVELS = ["read", "write"];
 
 const sectionForPage = (page) => {
   const section = String(page || "").split(".")[0];
@@ -118,8 +119,20 @@ export const canAccessPage = (user, page) => {
   return Boolean(section && (user.sections || []).includes(section));
 };
 
+export const pageAccessLevel = (user, page) => {
+  if (!canAccessPage(user, page)) return null;
+  if (user.role === "ELT" || !user.pageAccessConfigured) return "write";
+  return user.pageAccessLevels?.[page] === "read" ? "read" : "write";
+};
+
+export const canWritePage = (user, page) => pageAccessLevel(user, page) === "write";
+
 export const effectivePageAccess = (user) =>
   PAGE_ACCESS_KEYS.filter((page) => canAccessPage(user, page));
+
+export const effectivePageAccessLevels = (user) => Object.fromEntries(
+  effectivePageAccess(user).map((page) => [page, pageAccessLevel(user, page)])
+);
 
 export const firstAccessiblePath = (user, fallback = "/access-denied") =>
   PAGE_ACCESS_PAGES.find((page) => canAccessPage(user, page))?.path || fallback;

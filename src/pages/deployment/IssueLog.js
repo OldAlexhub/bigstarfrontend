@@ -4,6 +4,7 @@ import { apiGet, apiPost, apiPatch, apiDelete } from "../../api/client";
 import { toISODate, todayInTimezone, addDays } from "../../utils/dates";
 import { DISRUPTION_TYPES } from "../../config/disruptionTypes";
 import { useLatestRequest } from "../../hooks/useLatestRequest";
+import { usePagePermission } from "../../components/PageAccessRoute";
 
 const inputClasses =
   "rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500";
@@ -18,6 +19,7 @@ const emptyForm = (timezone) => ({
 
 const IssueLog = () => {
   const { selectedDivision } = useOutletContext();
+  const { canWrite } = usePagePermission();
   const [searchParams, setSearchParams] = useSearchParams();
   const routeCodeFilter = searchParams.get("routeCode") || "";
   const [routes, setRoutes] = useState([]);
@@ -62,10 +64,10 @@ const IssueLog = () => {
     setLoading(true);
     setError("");
     Promise.all([
-      apiGet(`/api/routes?division=${selectedDivision._id}`),
-      apiGet("/api/operators"),
+      canWrite ? apiGet(`/api/routes?division=${selectedDivision._id}`) : Promise.resolve({ routes: [] }),
+      canWrite ? apiGet("/api/operators") : Promise.resolve({ operators: [] }),
       apiGet(`/api/daily-issues?division=${selectedDivision._id}&from=${from}&to=${to}`),
-      apiGet(`/api/run-cuts?division=${selectedDivision._id}`),
+      canWrite ? apiGet(`/api/run-cuts?division=${selectedDivision._id}`) : Promise.resolve({ runCuts: [] }),
     ])
       .then(([routesData, operatorsData, issuesData, runCutsData]) => {
         if (!isCurrent(requestId)) return;
@@ -83,7 +85,7 @@ const IssueLog = () => {
   };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(load, [selectedDivision, from, to]);
+  useEffect(load, [selectedDivision, from, to, canWrite]);
 
   const filteredIssues = routeCodeFilter
     ? issues.filter((i) => i.route?.code === routeCodeFilter)
@@ -148,7 +150,7 @@ const IssueLog = () => {
 
   return (
     <div>
-      <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6">
+      {canWrite && <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6">
         <h2 className="mb-4 text-sm font-semibold text-slate-900">
           {editingId ? "Edit issue" : "Log an issue"} — {selectedDivision.name}
         </h2>
@@ -237,7 +239,7 @@ const IssueLog = () => {
             )}
           </div>
         </form>
-      </div>
+      </div>}
 
       {routeCodeFilter && (
         <p className="mb-3 flex items-center gap-2 text-sm text-slate-500">
@@ -277,7 +279,7 @@ const IssueLog = () => {
         <table className="min-w-full divide-y divide-slate-200 text-sm">
           <thead className="bg-slate-50">
             <tr>
-              {["Date", "Route", "Operator", "Disruption", "Notes", "Actions"].map((h) => (
+              {["Date", "Route", "Operator", "Disruption", "Notes", ...(canWrite ? ["Actions"] : [])].map((h) => (
                 <th key={h} className="px-3 py-2 text-left font-medium text-slate-500">
                   {h}
                 </th>
@@ -287,14 +289,14 @@ const IssueLog = () => {
           <tbody className="divide-y divide-slate-100">
             {loading && (
               <tr>
-                <td colSpan={6} className="px-3 py-6 text-center text-slate-400">
+                <td colSpan={canWrite ? 6 : 5} className="px-3 py-6 text-center text-slate-400">
                   Loading…
                 </td>
               </tr>
             )}
             {!loading && filteredIssues.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-3 py-6 text-center text-slate-400">
+                <td colSpan={canWrite ? 6 : 5} className="px-3 py-6 text-center text-slate-400">
                   No issues logged yet.
                 </td>
               </tr>
@@ -306,7 +308,7 @@ const IssueLog = () => {
                 <td className="px-3 py-2 text-slate-600">{issue.operator?.name || "—"}</td>
                 <td className="px-3 py-2 text-slate-900">{issue.disruptionType}</td>
                 <td className="px-3 py-2 text-slate-600">{issue.notes || "—"}</td>
-                <td className="px-3 py-2">
+                {canWrite && <td className="px-3 py-2">
                   {issue.autoSyncTag ? (
                     <span className="text-xs text-slate-400" title="Auto-synced from the route's live day — change it from Deployment's Live Schedule instead.">
                       (auto)
@@ -329,7 +331,7 @@ const IssueLog = () => {
                       </button>
                     </div>
                   )}
-                </td>
+                </td>}
               </tr>
             ))}
           </tbody>
