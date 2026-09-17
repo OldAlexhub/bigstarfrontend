@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { apiDelete, apiFormPost, apiGet, apiPost } from "../../api/client";
 
 const STEPS = ["Upload", "Match", "Review & Save"];
+export const RECENT_SUBMISSIONS_PAGE_SIZE = 3;
 const sources = {
   vision: {
     label: "Vision",
@@ -189,9 +190,14 @@ const MatchRow = ({ row, routes, resolution, setResolution, expanded, setExpande
   );
 };
 
+const REMOVE_CONFIRM_PHRASE = "yes remove";
+
 const RemoveSubmissionDialog = ({ item, busy, error, onCancel, onConfirm }) => {
+  const [confirmText, setConfirmText] = useState("");
+  useEffect(() => { setConfirmText(""); }, [item]);
   if (!item) return null;
   const confirmed = item.status === "confirmed";
+  const confirmReady = confirmText.trim().toLowerCase() === REMOVE_CONFIRM_PHRASE;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4" role="presentation" onMouseDown={() => { if (!busy) onCancel(); }}>
       <div
@@ -210,13 +216,27 @@ const RemoveSubmissionDialog = ({ item, busy, error, onCancel, onConfirm }) => {
         </p>
         <p id="remove-submission-description" className="mt-4 text-sm leading-6 text-slate-600">
           {confirmed
-            ? "Its active Network Success records will also be removed from Performance and ELT Reporting. The audit will remain, and you can upload corrected files afterward."
-            : "This unfinished submission will be discarded. You can upload the files again afterward."}
+            ? "Its active Network Success records will be permanently deleted from the database along with this submission. This cannot be undone — you can upload corrected files afterward."
+            : "This unfinished submission will be permanently deleted. This cannot be undone — you can upload the files again afterward."}
         </p>
+        <label htmlFor="remove-submission-confirm" className="mt-4 block text-sm text-slate-600">
+          Type <span className="font-semibold text-slate-800">{REMOVE_CONFIRM_PHRASE}</span> to confirm.
+        </label>
+        <input
+          id="remove-submission-confirm"
+          type="text"
+          autoFocus
+          autoComplete="off"
+          spellCheck={false}
+          value={confirmText}
+          disabled={busy}
+          onChange={(event) => setConfirmText(event.target.value)}
+          className="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+        />
         {error && <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
         <div className="mt-6 flex justify-end gap-3">
-          <button type="button" autoFocus disabled={busy} onClick={onCancel} className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50">Cancel</button>
-          <button type="button" disabled={busy} onClick={onConfirm} className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">
+          <button type="button" disabled={busy} onClick={onCancel} className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50">Cancel</button>
+          <button type="button" disabled={busy || !confirmReady} onClick={onConfirm} className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50">
             {busy ? "Removing…" : "Remove submission"}
           </button>
         </div>
@@ -225,8 +245,19 @@ const RemoveSubmissionDialog = ({ item, busy, error, onCancel, onConfirm }) => {
   );
 };
 
-const History = ({ submissions, onOpen, onRemove, openingId, removingId }) => (
-  <section className="mt-8">
+const History = ({ submissions, onOpen, onRemove, openingId, removingId }) => {
+  const [page, setPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(submissions.length / RECENT_SUBMISSIONS_PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageStart = (currentPage - 1) * RECENT_SUBMISSIONS_PAGE_SIZE;
+  const visibleSubmissions = submissions.slice(pageStart, pageStart + RECENT_SUBMISSIONS_PAGE_SIZE);
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, totalPages));
+  }, [totalPages]);
+
+  return (
+    <section className="mt-8">
     <div className="mb-3 flex items-center justify-between">
       <h2 className="text-base font-semibold text-slate-900">Recent submissions</h2>
       <span className="text-xs text-slate-400">Latest 25</span>
@@ -236,7 +267,7 @@ const History = ({ submissions, onOpen, onRemove, openingId, removingId }) => (
         <p className="px-4 py-6 text-sm text-slate-500">No submissions yet.</p>
       ) : (
         <div className="divide-y divide-slate-100">
-          {submissions.map((item) => (
+          {visibleSubmissions.map((item) => (
             <div key={item.id || item._id} className="grid gap-2 px-4 py-3 text-sm sm:grid-cols-[100px_1fr_180px_100px_auto] sm:items-center">
               <span className="font-medium capitalize text-slate-800">{item.source}</span>
               <span className="text-slate-600">{item.division ? `${item.division.code} · ${item.division.name}` : "Division not confirmed"}</span>
@@ -266,9 +297,44 @@ const History = ({ submissions, onOpen, onRemove, openingId, removingId }) => (
           ))}
         </div>
       )}
+      {totalPages > 1 && (
+        <nav aria-label="Recent submissions pages" className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-3">
+          <button
+            type="button"
+            disabled={currentPage === 1}
+            onClick={() => setPage((current) => Math.max(1, current - 1))}
+            className="text-xs font-medium text-slate-600 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Previous
+          </button>
+          <div className="flex items-center gap-1">
+            {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => (
+              <button
+                key={pageNumber}
+                type="button"
+                aria-current={pageNumber === currentPage ? "page" : undefined}
+                aria-label={`Page ${pageNumber}`}
+                onClick={() => setPage(pageNumber)}
+                className={`h-7 min-w-7 rounded px-2 text-xs font-medium ${pageNumber === currentPage ? "bg-brand-500 text-white" : "text-slate-600 hover:bg-slate-100"}`}
+              >
+                {pageNumber}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            disabled={currentPage === totalPages}
+            onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+            className="text-xs font-medium text-slate-600 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Next
+          </button>
+        </nav>
+      )}
     </div>
-  </section>
-);
+    </section>
+  );
+};
 
 const ExcelSubmissions = () => {
   const [source, setSource] = useState("vision");

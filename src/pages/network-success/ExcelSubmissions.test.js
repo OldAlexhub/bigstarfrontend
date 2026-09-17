@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { apiDelete, apiFormPost, apiGet, apiPost } from "../../api/client";
-import ExcelSubmissions from "./ExcelSubmissions";
+import ExcelSubmissions, { RECENT_SUBMISSIONS_PAGE_SIZE } from "./ExcelSubmissions";
 
 vi.mock("../../api/client", () => ({ apiDelete: vi.fn(), apiFormPost: vi.fn(), apiGet: vi.fn(), apiPost: vi.fn() }));
 
@@ -63,8 +63,14 @@ test("recent submissions can be removed and re-uploaded", async () => {
   expect(await screen.findByText("Division 6 - LYNX", { exact: false })).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Remove" }));
   expect(screen.getByRole("dialog", { name: "Remove this submission?" })).toBeInTheDocument();
+  const confirmButton = screen.getByRole("button", { name: "Remove submission" });
+  expect(confirmButton).toBeDisabled();
+  fireEvent.click(confirmButton);
   expect(apiDelete).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("button", { name: "Remove submission" }));
+
+  fireEvent.change(screen.getByLabelText(/Type/), { target: { value: "yes remove" } });
+  expect(confirmButton).toBeEnabled();
+  fireEvent.click(confirmButton);
 
   await waitFor(() => expect(apiDelete).toHaveBeenCalledWith("/api/network-success/submissions/submission-1"));
   expect(await screen.findByRole("status")).toHaveTextContent("Submission removed");
@@ -126,4 +132,37 @@ test("a confirmed submission opens as an editable revision with fresh matching",
   expect(await screen.findByText("Confirm the division, then review matches")).toBeInTheDocument();
   expect(screen.getByText("1037A")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Review final changes" })).toBeEnabled();
+});
+
+test("recent submissions paginate three records per view", async () => {
+  const submissions = Array.from({ length: 7 }, (_, index) => ({
+    id: `submission-${index + 1}`,
+    source: "vision",
+    status: "confirmed",
+    createdAt: `2026-09-${String(10 - index).padStart(2, "0")}T12:00:00.000Z`,
+    division: { code: `DIV_${index + 1}`, name: `Division ${index + 1}` },
+  }));
+  apiGet.mockReset();
+  apiGet.mockResolvedValue({ submissions });
+
+  render(<ExcelSubmissions />);
+
+  expect(await screen.findByText("DIV_1 · Division 1")).toBeInTheDocument();
+  expect(RECENT_SUBMISSIONS_PAGE_SIZE).toBe(3);
+  expect(screen.getByText("DIV_3 · Division 3")).toBeInTheDocument();
+  expect(screen.queryByText("DIV_4 · Division 4")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Page 1" })).toHaveAttribute("aria-current", "page");
+
+  fireEvent.click(screen.getByRole("button", { name: "Next" }));
+
+  expect(screen.getByText("DIV_4 · Division 4")).toBeInTheDocument();
+  expect(screen.getByText("DIV_6 · Division 6")).toBeInTheDocument();
+  expect(screen.queryByText("DIV_1 · Division 1")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Page 2" })).toHaveAttribute("aria-current", "page");
+
+  fireEvent.click(screen.getByRole("button", { name: "Page 3" }));
+
+  expect(screen.getByText("DIV_7 · Division 7")).toBeInTheDocument();
+  expect(screen.queryByText("DIV_6 · Division 6")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
 });

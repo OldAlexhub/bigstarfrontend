@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { apiGet, apiPatch } from "../../api/client";
-import NetworkPerformance from "./NetworkPerformance";
+import NetworkPerformance, { RECORDS_PAGE_SIZE } from "./NetworkPerformance";
 
 vi.mock("../../api/client", () => ({ apiGet: vi.fn(), apiPatch: vi.fn() }));
 
@@ -83,4 +83,41 @@ test("paginates Needs attention without changing severity order", async () => {
   expect(screen.getByText("Route 12")).toBeInTheDocument();
   expect(screen.getByText("Showing 11-12 of 12")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
+});
+
+test("shows route-day records 25 at a time", async () => {
+  const records = Array.from({ length: 27 }, (_, index) => ({
+    id: `entry-${index + 1}`,
+    date: "2026-09-01",
+    route: `Record ${String(index + 1).padStart(2, "0")}`,
+    trips: 10,
+    operator: "Operator A",
+    assignmentSource: "master_run_cuts",
+    hasAssignmentOverride: false,
+  }));
+  apiGet.mockImplementation((path) => {
+    if (path === "/api/divisions") return Promise.resolve({ divisions: [{ _id: "division-1", code: "D1", name: "Division One" }] });
+    if (path === "/api/operators") return Promise.resolve({ operators: [] });
+    return Promise.resolve({ ...analysis, records });
+  });
+
+  render(<NetworkPerformance />);
+
+  const viewAll = await screen.findByRole("button", { name: "View all 27 route-days" });
+  fireEvent.click(viewAll);
+
+  expect(RECORDS_PAGE_SIZE).toBe(25);
+  expect(screen.getByText("Record 01")).toBeInTheDocument();
+  expect(screen.getByText("Record 25")).toBeInTheDocument();
+  expect(screen.queryByText("Record 26")).not.toBeInTheDocument();
+  expect(screen.getByText("Showing 1-25 of 27")).toBeInTheDocument();
+
+  const pagination = screen.getByRole("navigation", { name: "Route-day records pagination" });
+  fireEvent.click(within(pagination).getByRole("button", { name: "Next" }));
+
+  expect(screen.queryByText("Record 01")).not.toBeInTheDocument();
+  expect(screen.getByText("Record 26")).toBeInTheDocument();
+  expect(screen.getByText("Record 27")).toBeInTheDocument();
+  expect(screen.getByText("Showing 26-27 of 27")).toBeInTheDocument();
+  expect(within(pagination).getByRole("button", { name: "Next" })).toBeDisabled();
 });

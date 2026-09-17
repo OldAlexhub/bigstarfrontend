@@ -16,6 +16,7 @@ const assignmentSourceLabel = {
   unavailable: "Not assigned",
 };
 const ATTENTION_PAGE_SIZE = 10;
+export const RECORDS_PAGE_SIZE = 25;
 
 const KpiStrip = ({ summary }) => {
   const cells = [
@@ -50,6 +51,7 @@ const NetworkPerformance = () => {
   const [editingId, setEditingId] = useState(null);
   const [showAllAssignments, setShowAllAssignments] = useState(false);
   const [assignmentForm, setAssignmentForm] = useState({ operatorId: "" });
+  const [recordsPage, setRecordsPage] = useState(1);
   const [attentionPage, setAttentionPage] = useState(1);
   const [savingAssignment, setSavingAssignment] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -62,6 +64,7 @@ const NetworkPerformance = () => {
     try {
       const data = await apiGet(`/api/network-success/performance?${queryString({ division: selectedDivision, ...filters })}`);
       setAnalysis(data);
+      setRecordsPage(1);
       setAttentionPage(1);
       if (adoptBounds) {
         setFrom(data.dateBounds.from || "");
@@ -154,6 +157,12 @@ const NetworkPerformance = () => {
   const currentAttentionPage = Math.min(attentionPage, attentionPageCount);
   const attentionStart = (currentAttentionPage - 1) * ATTENTION_PAGE_SIZE;
   const visibleAttentionItems = attentionItems.slice(attentionStart, attentionStart + ATTENTION_PAGE_SIZE);
+  const records = analysis?.records || [];
+  const recordsPageCount = Math.max(1, Math.ceil(records.length / RECORDS_PAGE_SIZE));
+  const currentRecordsPage = Math.min(recordsPage, recordsPageCount);
+  const recordsStart = (currentRecordsPage - 1) * RECORDS_PAGE_SIZE;
+  const visibleRecords = records.slice(recordsStart, recordsStart + RECORDS_PAGE_SIZE);
+  const assignmentItems = showAllAssignments ? visibleRecords : (analysis?.assignmentGaps || []);
 
   return (
     <div>
@@ -240,16 +249,16 @@ const NetworkPerformance = () => {
                 <h2 className="font-semibold text-slate-900">Assignment setup</h2>
                 <p className="text-xs text-slate-500">Master Run Cut operators match automatically. Missing provider data is ignored; correct only routes without the right operator.</p>
               </div>
-              <button type="button" onClick={() => setShowAllAssignments((current) => !current)} className="text-xs font-medium text-brand-600 hover:underline">
+              <button type="button" onClick={() => { setShowAllAssignments((current) => !current); setRecordsPage(1); }} className="text-xs font-medium text-brand-600 hover:underline">
                 {showAllAssignments ? "Show setup only" : `View all ${analysis.records?.length || 0} route-days`}
               </button>
             </div>
             {!showAllAssignments && (analysis.assignmentGaps || []).length === 0 && (
               <p className="px-4 py-6 text-sm text-emerald-700">Every route has an operator assignment.</p>
             )}
-            {(showAllAssignments ? (analysis.records || []) : (analysis.assignmentGaps || [])).length > 0 && (
+            {assignmentItems.length > 0 && (
               <div className="divide-y divide-slate-100">
-                {(showAllAssignments ? (analysis.records || []) : (analysis.assignmentGaps || [])).map((record) => (
+                {assignmentItems.map((record) => (
                   <div key={record.id}>
                     <div className="grid gap-2 px-4 py-3 text-sm md:grid-cols-[90px_120px_minmax(180px,1fr)_130px_90px_auto] md:items-center">
                       <span className="font-medium text-slate-900" title={record.routes?.join(", ")}>{record.routes?.length > 1 ? `${record.routes.length} routes` : record.route}</span>
@@ -288,6 +297,16 @@ const NetworkPerformance = () => {
                   </div>
                 ))}
               </div>
+            )}
+            {showAllAssignments && records.length > RECORDS_PAGE_SIZE && (
+              <nav aria-label="Route-day records pagination" className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50 px-4 py-3">
+                <p className="text-xs text-slate-500">Showing {recordsStart + 1}-{Math.min(recordsStart + RECORDS_PAGE_SIZE, records.length)} of {records.length}</p>
+                <div className="flex items-center gap-2">
+                  <button type="button" disabled={currentRecordsPage === 1} onClick={() => setRecordsPage((page) => Math.max(1, page - 1))} className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
+                  <span className="min-w-20 text-center text-xs font-medium text-slate-600">Page {currentRecordsPage} of {recordsPageCount}</span>
+                  <button type="button" disabled={currentRecordsPage === recordsPageCount} onClick={() => setRecordsPage((page) => Math.min(recordsPageCount, page + 1))} className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
+                </div>
+              </nav>
             )}
           </section>
 
