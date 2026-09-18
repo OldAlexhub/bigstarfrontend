@@ -816,6 +816,7 @@ const LiveSchedule = () => {
           onRemoveExtra={handleRemoveExtra}
           showDisposition={which === "today"}
           editableDailyAssignment
+          editablePulloutAddress={Boolean(selectedDivision?.pulloutAddressRules?.editableInLiveSchedule)}
           operators={operators}
           vehicles={vehicles}
           emptyMessage={

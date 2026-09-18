@@ -71,6 +71,7 @@ const RunCutDayTable = ({
   onRemoveExtra,
   onRoutePatch,
   onDeleteRoute,
+  editablePulloutAddress = false,
   showDivisionColumn = false,
   editableStatus = true,
   editableDisposition = true,
@@ -205,9 +206,25 @@ const RunCutDayTable = ({
                 )}
               </td>
               <td className="px-2 py-2">
-                <span className="block truncate text-slate-600" title={rc.pulloutAddress}>
-                  {rc.pulloutAddress || "—"}
-                </span>
+                {editablePulloutAddress ? (
+                  <input
+                    aria-label={`Pullout address for ${rc.route?.code}`}
+                    defaultValue={rc.pulloutAddress || ""}
+                    key={rc._id}
+                    disabled={savingId === rc._id}
+                    onBlur={(e) => {
+                      if (e.target.value !== (rc.pulloutAddress || "")) {
+                        onPatch(rc, { pulloutAddress: e.target.value });
+                      }
+                    }}
+                    placeholder="—"
+                    className="w-full rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                  />
+                ) : (
+                  <span className="block truncate text-slate-600" title={rc.pulloutAddress}>
+                    {rc.pulloutAddress || "—"}
+                  </span>
+                )}
               </td>
               <td className="px-2 py-2">
                 {assignmentInputs ? (
@@ -294,13 +311,12 @@ const RunCutDayTable = ({
                     disabled={
                       !editableDisposition ||
                       savingId === rc._id ||
-                      rc.dispositionSource === "standby" ||
                       rc.dispositionSource === "status"
                     }
                     onChange={(e) => onPatch(rc, { disposition: e.target.value || null })}
                     title={
                       rc.dispositionSource === "standby"
-                        ? "Automatically set by standby coverage"
+                        ? "Set by standby coverage — change or clear it here if needed"
                         : rc.dispositionSource === "status"
                         ? "Automatically set by Suspended status"
                         : "Final outcome for this route"

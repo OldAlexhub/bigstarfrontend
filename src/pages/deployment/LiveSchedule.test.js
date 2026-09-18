@@ -3,17 +3,17 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { apiGet, apiPost, apiPatch } from "../../api/client";
 import LiveSchedule, { splitRowsByDisposition } from "./LiveSchedule";
 
-vi.mock("react-router-dom", () => {
-  const selectedDivision = {
-    _id: "division-1",
-    code: "DIV_3_GL",
-    name: "Test Division",
-    timezone: "America/New_York",
-  };
-  return {
-    useOutletContext: () => ({ selectedDivision }),
-  };
-});
+const selectedDivision = vi.hoisted(() => ({
+  _id: "division-1",
+  code: "DIV_3_GL",
+  name: "Test Division",
+  timezone: "America/New_York",
+  pulloutAddressRules: { standbyKeepsRouteAddress: false, editableInLiveSchedule: false },
+}));
+
+vi.mock("react-router-dom", () => ({
+  useOutletContext: () => ({ selectedDivision }),
+}));
 
 vi.mock("../../api/client", () => ({
   apiGet: vi.fn(),
@@ -23,10 +23,11 @@ vi.mock("../../api/client", () => ({
 }));
 
 vi.mock("../../components/RunCutDayTable", () => ({
-  default: function MockRunCutDayTable({ rows, onPatch, showDisposition, emptyMessage }) {
+  default: function MockRunCutDayTable({ rows, onPatch, showDisposition, editablePulloutAddress, emptyMessage }) {
     return (
       <div>
         <span data-testid="show-disposition">{String(showDisposition)}</span>
+        <span data-testid="editable-pullout-address">{String(editablePulloutAddress)}</span>
         {rows.length === 0 && <span>{emptyMessage}</span>}
         {rows.map((row) => (
           <div key={row._id}>
@@ -68,6 +69,7 @@ describe("Live Schedule today route tabs", () => {
   beforeEach(() => {
     storedRows = originalRows.map((row) => ({ ...row, route: { ...row.route } }));
     standbyRows = [];
+    selectedDivision.pulloutAddressRules = { standbyKeepsRouteAddress: false, editableInLiveSchedule: false };
     apiGet.mockReset();
     apiPost.mockReset();
     apiPatch.mockReset();
@@ -329,6 +331,17 @@ describe("Live Schedule today route tabs", () => {
     expect(groups[0].querySelector("option").textContent).toBe("Operator Two");
     expect(groups[1]).toHaveAttribute("label", "Other drivers");
     expect(groups[1].querySelector("option").textContent).toBe("Operator One");
+  });
+
+  test("pullout address is only editable in the daily table when the division opts in", async () => {
+    render(<LiveSchedule />);
+    expect(await screen.findByTestId("editable-pullout-address")).toHaveTextContent("false");
+  });
+
+  test("a division with editableInLiveSchedule turned on exposes an editable pullout address", async () => {
+    selectedDivision.pulloutAddressRules = { standbyKeepsRouteAddress: false, editableInLiveSchedule: true };
+    render(<LiveSchedule />);
+    expect(await screen.findByTestId("editable-pullout-address")).toHaveTextContent("true");
   });
 });
 

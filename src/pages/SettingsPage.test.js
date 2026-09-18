@@ -154,4 +154,37 @@ describe("division lifecycle settings", () => {
       )
     );
   });
+
+  test("a division's standby coverage and pullout address rules can be turned on and saved", async () => {
+    apiPatch.mockImplementation((path, body) => {
+      const source = path.includes("division-active") ? activeDivision : retiredDivision;
+      return Promise.resolve({ division: { ...source, ...body } });
+    });
+    render(<MemoryRouter><SettingsPage /></MemoryRouter>);
+
+    await screen.findByDisplayValue("Division One");
+    fireEvent.click(screen.getByText("Advanced: standby coverage & pullout address rules"));
+
+    const standbyToggle = screen.getByLabelText("Standby keeps the route's own pullout address for DIV_1");
+    const editableToggle = screen.getByLabelText("Pullout address editable in Live Schedule for DIV_1");
+    expect(standbyToggle).not.toBeChecked();
+    expect(editableToggle).not.toBeChecked();
+
+    fireEvent.click(standbyToggle);
+    fireEvent.click(editableToggle);
+    expect(standbyToggle).toBeChecked();
+    expect(editableToggle).toBeChecked();
+
+    const row = standbyToggle.closest("tr");
+    fireEvent.click(within(row).getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(apiPatch).toHaveBeenCalledWith(
+        "/api/divisions/division-active",
+        expect.objectContaining({
+          pulloutAddressRules: { standbyKeepsRouteAddress: true, editableInLiveSchedule: true },
+        })
+      )
+    );
+  });
 });

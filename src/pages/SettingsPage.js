@@ -168,6 +168,14 @@ const SettingsPage = () => {
     setDivisions((prev) => prev.map((d) => (d._id === id ? { ...d, timezone: value } : d)));
   };
 
+  const handleDivisionPulloutRuleChange = (id, field, value) => {
+    setDivisions((prev) =>
+      prev.map((d) =>
+        d._id === id ? { ...d, pulloutAddressRules: { ...d.pulloutAddressRules, [field]: value } } : d
+      )
+    );
+  };
+
   const handleDivisionNameChange = (id, value) => {
     setDivisions((prev) => prev.map((d) => (d._id === id ? { ...d, name: value } : d)));
   };
@@ -191,6 +199,10 @@ const SettingsPage = () => {
               : Number(division.thresholds.revenueRatio),
         },
         timezone: division.timezone,
+        pulloutAddressRules: {
+          standbyKeepsRouteAddress: Boolean(division.pulloutAddressRules?.standbyKeepsRouteAddress),
+          editableInLiveSchedule: Boolean(division.pulloutAddressRules?.editableInLiveSchedule),
+        },
       });
       setDivisions((prev) => prev.map((d) => (d._id === division._id ? data.division : d)));
       flashSaved();
@@ -479,6 +491,80 @@ const SettingsPage = () => {
           </table>
         </div>
       </div>
+
+      <details className="mt-6 rounded-xl border border-slate-200 bg-white">
+        <summary className="cursor-pointer select-none px-6 py-4 text-sm font-semibold text-slate-900">
+          Advanced: standby coverage &amp; pullout address rules
+        </summary>
+        <div className="border-t border-slate-200 px-6 py-4">
+          <p className="mb-4 max-w-2xl text-xs text-slate-500">
+            Most divisions don't need this — a standby's own pullout address is normally the right one to show
+            on the route it covers, and pullout address is edited by picking a driver. Turn these on for a
+            division whose pullout addresses are tied to the route itself rather than to whichever driver is on
+            it — for example, Division 3 GoLink, which shares a standby pool with Division 3 ADA.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead>
+                <tr>
+                  <th className="px-3 py-2 text-left font-medium text-slate-500">Division</th>
+                  <th className="px-3 py-2 text-left font-medium text-slate-500">
+                    Standby keeps the route's own pullout address
+                  </th>
+                  <th className="px-3 py-2 text-left font-medium text-slate-500">
+                    Pullout address editable in Live Schedule
+                  </th>
+                  <th className="px-3 py-2" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {displayedDivisions.map((d) => (
+                  <tr key={d._id} className={d.active === false ? "bg-slate-50 opacity-75" : ""}>
+                    <td className="px-3 py-2 font-medium text-slate-900">
+                      <span className="block text-xs text-slate-400">{d.code}</span>
+                      {d.name}
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="checkbox"
+                        aria-label={`Standby keeps the route's own pullout address for ${d.code}`}
+                        checked={Boolean(d.pulloutAddressRules?.standbyKeepsRouteAddress)}
+                        disabled={d.active === false}
+                        onChange={(e) =>
+                          handleDivisionPulloutRuleChange(d._id, "standbyKeepsRouteAddress", e.target.checked)
+                        }
+                        className="h-4 w-4 rounded border-slate-300"
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="checkbox"
+                        aria-label={`Pullout address editable in Live Schedule for ${d.code}`}
+                        checked={Boolean(d.pulloutAddressRules?.editableInLiveSchedule)}
+                        disabled={d.active === false}
+                        onChange={(e) =>
+                          handleDivisionPulloutRuleChange(d._id, "editableInLiveSchedule", e.target.checked)
+                        }
+                        className="h-4 w-4 rounded border-slate-300"
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <button
+                        type="button"
+                        onClick={() => handleDivisionSave(d)}
+                        disabled={d.active === false}
+                        className="text-xs font-medium text-brand-600 hover:underline disabled:text-slate-300 disabled:no-underline"
+                      >
+                        Save
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </details>
 
       {isELT && <OperationsKpiSettings divisions={activeDivisions} />}
 
