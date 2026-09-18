@@ -10,6 +10,7 @@ import { canAccessPage } from "../../config/pageAccess";
 
 const TABS = [
   { to: "/deployment", label: "Live Schedule", end: true, permission: "deployment.live_schedule" },
+  { to: "/deployment/permanent-osr", label: "Permanent OSR", end: false, permission: "deployment.permanent_osr" },
   { to: "/deployment/standby-utilization", label: "STBY Utilization", end: false, permission: "deployment.standby_utilization" },
   { to: "/deployment/issue-log", label: "Issue Log", end: false, permission: "deployment.issue_log" },
   { to: "/deployment/client-report", label: "Client Report", end: false, permission: "deployment.client_report" },

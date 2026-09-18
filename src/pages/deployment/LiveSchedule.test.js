@@ -190,6 +190,27 @@ describe("Live Schedule today route tabs", () => {
     expect(await screen.findByText(/OSR processed for OPEN-1/)).toBeInTheDocument();
   });
 
+  test("an OSR pullout address auto-fills from the driver but can be overwritten", async () => {
+    render(<LiveSchedule />);
+    fireEvent.click(await screen.findByRole("button", { name: /Orion Service Request/ }));
+    const processButton = await screen.findByRole("button", { name: "Process OSR" });
+
+    fireEvent.change(screen.getByLabelText("OSR driver"), { target: { value: "operator-2" } });
+    expect(screen.getByLabelText("OSR pullout address")).toHaveValue("200 Broad St");
+
+    fireEvent.change(screen.getByLabelText("OSR pullout address"), {
+      target: { value: "500 Rider Requested Ave" },
+    });
+    fireEvent.click(processButton);
+
+    await waitFor(() =>
+      expect(apiPatch).toHaveBeenCalledWith(
+        "/api/run-cut-days/open-1",
+        expect.objectContaining({ pulloutAddress: "500 Rider Requested Ave" })
+      )
+    );
+  });
+
   test("an Orion Service Request sends suspended only when selected explicitly", async () => {
     render(<LiveSchedule />);
     fireEvent.click(await screen.findByRole("button", { name: /Orion Service Request/ }));
@@ -237,6 +258,77 @@ describe("Live Schedule today route tabs", () => {
         expect.objectContaining({ routeId: "route-3", notes: "Added demand" })
       )
     );
+  });
+
+  test("a made-up route number can be sent for a one-day-only revenue route", async () => {
+    apiGet.mockImplementation((url) => {
+      if (url.startsWith("/api/run-cut-days")) return Promise.resolve({ runCutDays: storedRows });
+      if (url.startsWith("/api/routes")) return Promise.resolve({ routes: [] });
+      if (url.startsWith("/api/run-cuts")) return Promise.resolve({ runCuts: [] });
+      if (url.startsWith("/api/operators")) return Promise.resolve({ operators: [] });
+      if (url.startsWith("/api/vehicles")) return Promise.resolve({ vehicles: [] });
+      if (url.startsWith("/api/settings")) return Promise.resolve({ settings: { osrAdvanceDays: 7 } });
+      return Promise.reject(new Error(`Unexpected request: ${url}`));
+    });
+
+    render(<LiveSchedule />);
+    fireEvent.click(await screen.findByRole("button", { name: "+ Add Revenue Route" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Make up a route number for today" }));
+
+    fireEvent.change(screen.getByPlaceholderText("Route number"), { target: { value: "9001-X" } });
+    fireEvent.change(screen.getByLabelText("Notes"), { target: { value: "Charter overflow" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add revenue route" }));
+
+    await waitFor(() =>
+      expect(apiPost).toHaveBeenCalledWith(
+        "/api/run-cut-days",
+        expect.objectContaining({ routeCode: "9001-X", notes: "Charter overflow" })
+      )
+    );
+    expect(apiPost.mock.calls[0][1]).not.toHaveProperty("routeId");
+  });
+
+  test("standby drivers are grouped ahead of other division drivers in the extra-route picker", async () => {
+    apiGet.mockImplementation((url) => {
+      if (url.startsWith("/api/run-cut-days")) {
+        if (url.includes("includeStandby=1")) {
+          return Promise.resolve({
+            runCutDays: [
+              {
+                _id: "standby-day-9",
+                route: { _id: "standby-route-9", code: "STBY-9", type: "standby" },
+                operator: { _id: "operator-2", name: "Operator Two" },
+              },
+            ],
+          });
+        }
+        return Promise.resolve({ runCutDays: storedRows });
+      }
+      if (url.startsWith("/api/routes")) return Promise.resolve({ routes: [] });
+      if (url.startsWith("/api/run-cuts")) return Promise.resolve({ runCuts: [] });
+      if (url.startsWith("/api/operators")) {
+        return Promise.resolve({
+          operators: [
+            { _id: "operator-1", name: "Operator One", active: true },
+            { _id: "operator-2", name: "Operator Two", active: true },
+          ],
+        });
+      }
+      if (url.startsWith("/api/vehicles")) return Promise.resolve({ vehicles: [] });
+      if (url.startsWith("/api/settings")) return Promise.resolve({ settings: { osrAdvanceDays: 7 } });
+      return Promise.reject(new Error(`Unexpected request: ${url}`));
+    });
+
+    render(<LiveSchedule />);
+    fireEvent.click(await screen.findByRole("button", { name: "+ Add Revenue Route" }));
+
+    const driverSelect = await screen.findByLabelText("Driver");
+    const groups = driverSelect.querySelectorAll("optgroup");
+    expect(groups).toHaveLength(2);
+    expect(groups[0]).toHaveAttribute("label", "Standby (priority)");
+    expect(groups[0].querySelector("option").textContent).toBe("Operator Two");
+    expect(groups[1]).toHaveAttribute("label", "Other drivers");
+    expect(groups[1].querySelector("option").textContent).toBe("Operator One");
   });
 });
 

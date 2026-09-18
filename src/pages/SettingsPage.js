@@ -146,6 +146,7 @@ const SettingsPage = () => {
         breakMinutes: Number(settings.breakMinutes),
         revenueRatio: Number(settings.revenueRatio),
         osrAdvanceDays: Number(settings.osrAdvanceDays ?? 7),
+        scheduleHistoryLookbackWeeks: Number(settings.scheduleHistoryLookbackWeeks ?? 6),
         operationsReportingStartMonth: settings.operationsReportingStartMonth,
       });
       setSettings(data.settings);
@@ -286,57 +287,80 @@ const SettingsPage = () => {
 
       <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6">
         <h2 className="mb-4 text-sm font-semibold text-slate-900">Company-wide defaults</h2>
-        <form onSubmit={handleSettingsSave} className="flex flex-wrap items-end gap-6">
-          <label className="text-sm text-slate-600">
-            Break minutes
-            <input
-              type="number"
-              disabled={!isELT}
-              value={settings.breakMinutes}
-              onChange={(e) => setSettings({ ...settings, breakMinutes: e.target.value })}
-              className={`${inputClasses} mt-1 block`}
-            />
-          </label>
-          <label className="text-sm text-slate-600">
-            Revenue ratio
-            <input
-              type="number"
-              step="0.01"
-              disabled={!isELT}
-              value={settings.revenueRatio}
-              onChange={(e) => setSettings({ ...settings, revenueRatio: e.target.value })}
-              className={`${inputClasses} mt-1 block`}
-            />
-          </label>
-          <label className="text-sm text-slate-600">
-            OSR advance days
-            <input
-              type="number"
-              min="0"
-              max="7"
-              step="1"
-              disabled={!isELT}
-              value={settings.osrAdvanceDays ?? 7}
-              onChange={(e) => setSettings({ ...settings, osrAdvanceDays: e.target.value })}
-              className={`${inputClasses} mt-1 block`}
-            />
-            <span className="mt-1 block max-w-xs text-xs font-normal text-slate-400">
-              How far ahead Deployment can process an OSR (maximum 7 days).
-            </span>
-          </label>
-          <label className="text-sm text-slate-600">
-            CAP activation month
-            <input
-              type="month"
-              disabled={!isELT}
-              value={settings.operationsReportingStartMonth || ""}
-              onChange={(e) => setSettings({ ...settings, operationsReportingStartMonth: e.target.value })}
-              className="mt-1 block w-40 rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-            />
-            <span className="mt-1 block max-w-xs text-xs font-normal text-slate-400">Completed months before this are never eligible to open a CAP, even if Red or Critical.</span>
-          </label>
+        <form onSubmit={handleSettingsSave}>
+          <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
+            <label className="text-sm text-slate-600">
+              Break minutes
+              <input
+                type="number"
+                disabled={!isELT}
+                value={settings.breakMinutes}
+                onChange={(e) => setSettings({ ...settings, breakMinutes: e.target.value })}
+                className={`${inputClasses} mt-1 block`}
+              />
+            </label>
+            <label className="text-sm text-slate-600">
+              Revenue ratio
+              <input
+                type="number"
+                step="0.01"
+                disabled={!isELT}
+                value={settings.revenueRatio}
+                onChange={(e) => setSettings({ ...settings, revenueRatio: e.target.value })}
+                className={`${inputClasses} mt-1 block`}
+              />
+            </label>
+            <label className="text-sm text-slate-600">
+              OSR advance days
+              <input
+                type="number"
+                min="0"
+                max="7"
+                step="1"
+                disabled={!isELT}
+                value={settings.osrAdvanceDays ?? 7}
+                onChange={(e) => setSettings({ ...settings, osrAdvanceDays: e.target.value })}
+                className={`${inputClasses} mt-1 block`}
+              />
+              <span className="mt-1 block text-xs font-normal text-slate-400">
+                How far ahead Deployment can process an OSR (maximum 7 days).
+              </span>
+            </label>
+            <label className="text-sm text-slate-600">
+              Schedule History lookback weeks
+              <input
+                type="number"
+                min="1"
+                max="12"
+                step="1"
+                disabled={!isELT}
+                value={settings.scheduleHistoryLookbackWeeks ?? 6}
+                onChange={(e) => setSettings({ ...settings, scheduleHistoryLookbackWeeks: e.target.value })}
+                className={`${inputClasses} mt-1 block`}
+              />
+              <span className="mt-1 block text-xs font-normal text-slate-400">
+                How far back Deployment's Schedule History date picker can go (1-12 weeks).
+              </span>
+            </label>
+            <label className="text-sm text-slate-600">
+              CAP activation month
+              <input
+                type="month"
+                disabled={!isELT}
+                value={settings.operationsReportingStartMonth || ""}
+                onChange={(e) => setSettings({ ...settings, operationsReportingStartMonth: e.target.value })}
+                className="mt-1 block w-40 rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              />
+              <span className="mt-1 block text-xs font-normal text-slate-400">
+                Completed months before this are never eligible to open a CAP, even if Red or Critical.
+              </span>
+            </label>
+          </div>
           {isELT && (
-            <button type="submit" className="rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600">
+            <button
+              type="submit"
+              className="mt-6 rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
+            >
               Save defaults
             </button>
           )}

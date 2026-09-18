@@ -141,6 +141,7 @@ const StandbyPanel = ({ selectedDivision, targetDate, which, coverableRoutes, on
 const osrFormForDay = (day) => ({
   operatorId: day?.operator?._id || "",
   vehicleId: day?.vehicle?._id || "",
+  pulloutAddress: day?.pulloutAddress || "",
   startTime: day?.startTime || "",
   endTime: day?.endTime || "",
   status: day?.status || "active",
@@ -209,6 +210,7 @@ const OsrPlanner = ({ selectedDivision, advanceDays, operators, vehicles, onProc
         disruptionNotes: form.disruptionNotes,
         operatorId: form.operatorId,
         vehicleId: form.vehicleId,
+        pulloutAddress: form.pulloutAddress,
         startTime: form.startTime || null,
         endTime: form.endTime || null,
         status: form.status,
@@ -295,7 +297,15 @@ const OsrPlanner = ({ selectedDivision, advanceDays, operators, vehicles, onProc
               <select
                 aria-label="OSR driver"
                 value={form.operatorId}
-                onChange={(event) => setForm((current) => ({ ...current, operatorId: event.target.value }))}
+                onChange={(event) => {
+                  const operatorId = event.target.value;
+                  const operatorDoc = operators.find((operator) => operator._id === operatorId);
+                  setForm((current) => ({
+                    ...current,
+                    operatorId,
+                    pulloutAddress: operatorDoc?.pulloutAddress || "",
+                  }));
+                }}
                 className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
               >
                 <option value="">— Unassigned —</option>
@@ -322,10 +332,10 @@ const OsrPlanner = ({ selectedDivision, advanceDays, operators, vehicles, onProc
               Pullout address
               <input
                 aria-label="OSR pullout address"
-                value={operators.find((operator) => operator._id === form.operatorId)?.pulloutAddress || ""}
-                readOnly
-                placeholder="Derived from driver"
-                className="mt-1 block w-full rounded-md border border-slate-200 bg-slate-100 px-2 py-1.5 text-sm text-slate-500"
+                value={form.pulloutAddress}
+                onChange={(event) => setForm((current) => ({ ...current, pulloutAddress: event.target.value }))}
+                placeholder="Auto-filled from driver; edit if this trip needs a different pickup"
+                className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
               />
             </label>
             <label className="text-sm text-slate-600">
@@ -397,6 +407,7 @@ const OsrPlanner = ({ selectedDivision, advanceDays, operators, vehicles, onProc
 
 const emptyExtra = {
   routeId: "",
+  routeCode: "",
   operatorId: "",
   vehicleId: "",
   startTime: "",
@@ -432,6 +443,9 @@ const LiveSchedule = () => {
   const [newExtra, setNewExtra] = useState(emptyExtra);
   const [addExtraError, setAddExtraError] = useState("");
   const [addingExtra, setAddingExtra] = useState(false);
+  const [useNewRouteNumber, setUseNewRouteNumber] = useState(false);
+  const [standbyOperatorIds, setStandbyOperatorIds] = useState(() => new Set());
+  const standbyOperatorsRequest = useLatestRequest();
 
   const today = todayInTimezone(selectedDivision?.timezone);
   const targetDate = which === "today" ? today : addDays(today, 1);
@@ -514,6 +528,23 @@ const LiveSchedule = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDivision]);
 
+  // Who's on standby today/tomorrow, so the extra-route driver picker can put
+  // them ahead of everyone else already scheduled elsewhere in the division.
+  useEffect(() => {
+    if (!selectedDivision) return;
+    const requestId = standbyOperatorsRequest.begin();
+    apiGet(`/api/run-cut-days?division=${selectedDivision._id}&from=${dateStr}&to=${dateStr}&includeStandby=1`)
+      .then((data) => {
+        if (!standbyOperatorsRequest.isCurrent(requestId)) return;
+        const ids = (data.runCutDays || [])
+          .filter((runCutDay) => runCutDay.route?.type === "standby" && runCutDay.operator?._id)
+          .map((runCutDay) => runCutDay.operator._id);
+        setStandbyOperatorIds(new Set(ids));
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDivision, dateStr]);
+
   const sortedRows = [...rows].sort((a, b) =>
     String(a.route?.code).localeCompare(String(b.route?.code), undefined, { numeric: true })
   );
@@ -521,6 +552,12 @@ const LiveSchedule = () => {
   const visibleRows = which === "today" ? todayRows[todayView] : sortedRows;
   const scheduledRouteIds = new Set(rows.map((row) => row.route?._id).filter(Boolean));
   const availableExtraRoutes = routes.filter((route) => !scheduledRouteIds.has(route._id));
+
+  // Standby drivers get first crack at picking up a one-off route; everyone
+  // else in the division's active roster follows at lower priority.
+  const activeExtraOperators = operators.filter((operator) => operator.active !== false);
+  const priorityExtraOperators = activeExtraOperators.filter((operator) => standbyOperatorIds.has(operator._id));
+  const otherExtraOperators = activeExtraOperators.filter((operator) => !standbyOperatorIds.has(operator._id));
 
   const handlePatch = async (runCutDay, patch) => {
     setSavingId(runCutDay._id);
@@ -536,14 +573,15 @@ const LiveSchedule = () => {
 
   const handleAddExtra = async (e) => {
     e.preventDefault();
-    if (!newExtra.routeId || !selectedDivision) return;
+    if (useNewRouteNumber ? !newExtra.routeCode.trim() : !newExtra.routeId) return;
+    if (!selectedDivision) return;
     setAddingExtra(true);
     setAddExtraError("");
     try {
       await apiPost("/api/run-cut-days", {
         division: selectedDivision._id,
         date: dateStr,
-        routeId: newExtra.routeId,
+        ...(useNewRouteNumber ? { routeCode: newExtra.routeCode } : { routeId: newExtra.routeId }),
         operatorId: newExtra.operatorId,
         vehicleId: newExtra.vehicleId,
         startTime: newExtra.startTime || null,
@@ -614,28 +652,48 @@ const LiveSchedule = () => {
           <div className="flex flex-wrap items-end gap-3">
             <label className="text-sm text-slate-600">
               Revenue route
-              <select
-                value={newExtra.routeId}
-                onChange={(event) => {
-                  const routeId = event.target.value;
-                  const assignment = assignmentForRouteId(routeId);
-                  setNewExtra({
-                    ...emptyExtra,
-                    routeId,
-                    operatorId: assignment?.operator?._id || "",
-                    vehicleId: assignment?.vehicle?._id || "",
-                    startTime: assignment?.startTime || "",
-                    endTime: assignment?.endTime || "",
-                  });
+              {useNewRouteNumber ? (
+                <input
+                  value={newExtra.routeCode}
+                  onChange={(e) => setNewExtra({ ...newExtra, routeCode: e.target.value })}
+                  placeholder="Route number"
+                  required
+                  className="mt-1 block w-40 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                />
+              ) : (
+                <select
+                  value={newExtra.routeId}
+                  onChange={(event) => {
+                    const routeId = event.target.value;
+                    const assignment = assignmentForRouteId(routeId);
+                    setNewExtra({
+                      ...emptyExtra,
+                      routeId,
+                      operatorId: assignment?.operator?._id || "",
+                      vehicleId: assignment?.vehicle?._id || "",
+                      startTime: assignment?.startTime || "",
+                      endTime: assignment?.endTime || "",
+                    });
+                  }}
+                  required
+                  className="mt-1 block min-w-40 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                >
+                  <option value="">Select from division pool</option>
+                  {availableExtraRoutes.map((route) => (
+                    <option key={route._id} value={route._id}>{route.code}</option>
+                  ))}
+                </select>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setUseNewRouteNumber((v) => !v);
+                  setNewExtra(emptyExtra);
                 }}
-                required
-                className="mt-1 block min-w-40 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                className="mt-1 block text-xs font-medium text-brand-600 hover:underline"
               >
-                <option value="">Select from division pool</option>
-                {availableExtraRoutes.map((route) => (
-                  <option key={route._id} value={route._id}>{route.code}</option>
-                ))}
-              </select>
+                {useNewRouteNumber ? "Choose from division pool instead" : "Make up a route number for today"}
+              </button>
             </label>
             <label className="text-sm text-slate-600">
               Driver
@@ -645,9 +703,20 @@ const LiveSchedule = () => {
                 className="mt-1 block w-48 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm"
               >
                 <option value="">Unassigned</option>
-                {operators.filter((operator) => operator.active !== false).map((operator) => (
-                  <option key={operator._id} value={operator._id}>{operator.name}</option>
-                ))}
+                {priorityExtraOperators.length > 0 && (
+                  <optgroup label="Standby (priority)">
+                    {priorityExtraOperators.map((operator) => (
+                      <option key={operator._id} value={operator._id}>{operator.name}</option>
+                    ))}
+                  </optgroup>
+                )}
+                {otherExtraOperators.length > 0 && (
+                  <optgroup label={priorityExtraOperators.length > 0 ? "Other drivers" : "Drivers"}>
+                    {otherExtraOperators.map((operator) => (
+                      <option key={operator._id} value={operator._id}>{operator.name}</option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
             </label>
             <label className="text-sm text-slate-600">

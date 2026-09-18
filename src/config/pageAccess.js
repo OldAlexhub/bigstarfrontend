@@ -22,6 +22,7 @@ export const PAGE_ACCESS_GROUPS = [
     label: "Deployment",
     pages: [
       { key: "deployment.live_schedule", label: "Live Schedule", path: "/deployment" },
+      { key: "deployment.permanent_osr", label: "Permanent OSR", path: "/deployment/permanent-osr" },
       { key: "deployment.standby_utilization", label: "STBY Utilization", path: "/deployment/standby-utilization" },
       { key: "deployment.issue_log", label: "Issue Log", path: "/deployment/issue-log" },
       { key: "deployment.client_report", label: "Client Report", path: "/deployment/client-report" },

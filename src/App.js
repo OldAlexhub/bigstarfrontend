@@ -11,6 +11,7 @@ import DriversRoster from "./pages/master-run-cuts/DriversRoster";
 import VehiclesRoster from "./pages/master-run-cuts/VehiclesRoster";
 import DeploymentLayout from "./pages/deployment/DeploymentLayout";
 import LiveSchedule from "./pages/deployment/LiveSchedule";
+import PermanentOsr from "./pages/deployment/PermanentOsr";
 import IssueLog from "./pages/deployment/IssueLog";
 import ClientReport from "./pages/deployment/ClientReport";
 import Reporting from "./pages/deployment/Reporting";
@@ -74,6 +75,7 @@ function App() {
           </Route>
           <Route path="/deployment" element={<DeploymentLayout />}>
             <Route index element={allow("deployment.live_schedule", <LiveSchedule />)} />
+            <Route path="permanent-osr" element={allow("deployment.permanent_osr", <PermanentOsr />)} />
             <Route path="standby-utilization" element={allow("deployment.standby_utilization", <StandbyUtilization />)} />
             <Route path="issue-log" element={allow("deployment.issue_log", <IssueLog />)} />
             <Route path="client-report" element={allow("deployment.client_report", <ClientReport />)} />

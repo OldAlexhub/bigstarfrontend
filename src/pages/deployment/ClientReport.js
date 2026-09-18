@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
-import { apiGet } from "../../api/client";
+import { apiGet, apiDownload } from "../../api/client";
 import { toISODate, todayInTimezone, addDays } from "../../utils/dates";
 
 const DAY_LABELS = {
@@ -183,8 +183,13 @@ const ClientReport = () => {
   const targetDate = which === "today" ? today : addDays(today, 1);
   const dateStr = toISODate(targetDate);
 
+  const [workOrderFrom, setWorkOrderFrom] = useState(toISODate(today));
+  const [downloadingWorkOrder, setDownloadingWorkOrder] = useState(false);
+  const [workOrderError, setWorkOrderError] = useState("");
+
   useEffect(() => {
     if (!selectedDivision) return undefined;
+    if (reportType === "workOrder") return undefined;
     let cancelled = false;
     setLoading(true);
     setError("");
@@ -204,6 +209,29 @@ const ClientReport = () => {
       cancelled = true;
     };
   }, [selectedDivision, dateStr, reportType]);
+
+  const handleDownloadWorkOrder = async () => {
+    if (!selectedDivision || !workOrderFrom) return;
+    setDownloadingWorkOrder(true);
+    setWorkOrderError("");
+    try {
+      const { blob, filename } = await apiDownload(
+        `/api/reports/work-order?division=${encodeURIComponent(selectedDivision._id)}&from=${encodeURIComponent(workOrderFrom)}`
+      );
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setWorkOrderError(err.message);
+    } finally {
+      setDownloadingWorkOrder(false);
+    }
+  };
 
   const handleCopy = async () => {
     setCopyStatus("");
@@ -230,6 +258,7 @@ const ClientReport = () => {
         {[
           { key: "schedule", label: "Daily Schedule" },
           { key: "updates", label: "Updates" },
+          { key: "workOrder", label: "Work Order" },
         ].map((option) => (
           <button
             key={option.key}
@@ -248,76 +277,112 @@ const ClientReport = () => {
         ))}
       </div>
 
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex gap-1">
-            {[
-              { key: "today", label: "Today", date: today },
-              { key: "tomorrow", label: "Tomorrow", date: addDays(today, 1) },
-            ].map((option) => (
-              <button
-                key={option.key}
-                type="button"
-                onClick={() => setWhich(option.key)}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  which === option.key ? "bg-brand-500 text-white" : "bg-white text-slate-600 hover:bg-slate-100"
-                }`}
-              >
-                {option.label} <span className="opacity-70">({toISODate(option.date)})</span>
-              </button>
-            ))}
-          </div>
-          {reportType === "updates" && (
+      {reportType === "workOrder" ? (
+        <div>
+          <p className="mb-4 max-w-3xl text-sm text-slate-600">
+            Downloads a 7-day Work Order for the selected division, one tab per weekday starting from the date
+            below. Each day reflects the live schedule as it currently stands — including any day-specific OSR
+            processed in Live Schedule — not just the persistent Master Run Cut. A Permanent OSR is reflected here
+            the same way, since it becomes part of the standing plan.
+          </p>
+          <div className="flex flex-wrap items-end gap-3">
             <label className="text-sm text-slate-600">
-              Request wording
+              Start date
               <input
-                type="text"
-                aria-label="Request wording"
-                value={requestWording[which]}
-                onChange={(event) =>
-                  setRequestWording((current) => ({ ...current, [which]: event.target.value }))
-                }
-                className="mt-1 block w-80 max-w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                type="date"
+                aria-label="Work order start date"
+                value={workOrderFrom}
+                onChange={(event) => setWorkOrderFrom(event.target.value)}
+                className="mt-1 block rounded-md border border-slate-300 px-2 py-1.5 text-sm"
               />
             </label>
+            <button
+              type="button"
+              onClick={handleDownloadWorkOrder}
+              disabled={downloadingWorkOrder || !workOrderFrom}
+              className="rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
+            >
+              {downloadingWorkOrder ? "Downloading…" : "Download Work Order"}
+            </button>
+          </div>
+          {workOrderError && (
+            <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{workOrderError}</p>
           )}
         </div>
-        <button
-          type="button"
-          onClick={handleCopy}
-          disabled={copyDisabled}
-          className="rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
-        >
-          {reportType === "updates" ? "Copy update" : "Copy schedule"}
-        </button>
-      </div>
-
-      {error && <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
-      {copyStatus && <p className="mb-4 text-sm text-slate-500">{copyStatus}</p>}
-      {loading && <p className="text-sm text-slate-500">Loading…</p>}
-
-      {!loading && reportType === "updates" && report?.rows?.length === 0 && (
-        <div className="rounded-xl border border-slate-200 bg-white px-4 py-6 text-center">
-          <p className="text-sm font-medium text-slate-700">No daily schedule exceptions to send.</p>
-          <p className="mt-1 text-xs text-slate-500">
-            Exceptions entered in Live Schedule for {which} will appear here.
-          </p>
-        </div>
-      )}
-
-      {!loading && report && (reportType === "schedule" || report.rows.length > 0) && (
-        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white p-6">
-          <div
-            ref={reportRef}
-            style={{ minWidth: reportType === "updates" ? 1120 : 900, fontFamily: "Calibri, Arial, sans-serif", color: "#1e293b" }}
-          >
-            {reportType === "updates" ? (
-              <UpdatesEmail report={report} dateStr={dateStr} requestWording={requestWording[which]} />
-            ) : (
-              <FullScheduleEmail report={report} dateStr={dateStr} />
-            )}
+      ) : (
+        <>
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="flex gap-1">
+                {[
+                  { key: "today", label: "Today", date: today },
+                  { key: "tomorrow", label: "Tomorrow", date: addDays(today, 1) },
+                ].map((option) => (
+                  <button
+                    key={option.key}
+                    type="button"
+                    onClick={() => setWhich(option.key)}
+                    className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                      which === option.key ? "bg-brand-500 text-white" : "bg-white text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    {option.label} <span className="opacity-70">({toISODate(option.date)})</span>
+                  </button>
+                ))}
+              </div>
+              {reportType === "updates" && (
+                <label className="text-sm text-slate-600">
+                  Request wording
+                  <input
+                    type="text"
+                    aria-label="Request wording"
+                    value={requestWording[which]}
+                    onChange={(event) =>
+                      setRequestWording((current) => ({ ...current, [which]: event.target.value }))
+                    }
+                    className="mt-1 block w-80 max-w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                  />
+                </label>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={handleCopy}
+              disabled={copyDisabled}
+              className="rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
+            >
+              {reportType === "updates" ? "Copy update" : "Copy schedule"}
+            </button>
           </div>
-        </div>
+
+          {error && <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+          {copyStatus && <p className="mb-4 text-sm text-slate-500">{copyStatus}</p>}
+          {loading && <p className="text-sm text-slate-500">Loading…</p>}
+
+          {!loading && reportType === "updates" && report?.rows?.length === 0 && (
+            <div className="rounded-xl border border-slate-200 bg-white px-4 py-6 text-center">
+              <p className="text-sm font-medium text-slate-700">No daily schedule exceptions to send.</p>
+              <p className="mt-1 text-xs text-slate-500">
+                Exceptions entered in Live Schedule for {which} will appear here.
+              </p>
+            </div>
+          )}
+
+          {!loading && report && (reportType === "schedule" || report.rows.length > 0) && (
+            <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white p-6">
+              <div
+                ref={reportRef}
+                style={{ minWidth: reportType === "updates" ? 1120 : 900, fontFamily: "Calibri, Arial, sans-serif", color: "#1e293b" }}
+              >
+                {reportType === "updates" ? (
+                  <UpdatesEmail report={report} dateStr={dateStr} requestWording={requestWording[which]} />
+                ) : (
+                  <FullScheduleEmail report={report} dateStr={dateStr} />
+                )}
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

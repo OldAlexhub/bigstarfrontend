@@ -5,6 +5,8 @@ import RunCutDayTable from "../../components/RunCutDayTable";
 import { addDays, toISODate, todayInTimezone } from "../../utils/dates";
 import { useLatestRequest } from "../../hooks/useLatestRequest";
 
+const DEFAULT_LOOKBACK_WEEKS = 6;
+
 const ScheduleHistory = () => {
   const { selectedDivision } = useOutletContext();
   const yesterday = toISODate(addDays(todayInTimezone(selectedDivision?.timezone), -1));
@@ -14,11 +16,20 @@ const ScheduleHistory = () => {
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState(null);
   const [error, setError] = useState("");
+  const [lookbackWeeks, setLookbackWeeks] = useState(DEFAULT_LOOKBACK_WEEKS);
   const { begin, isCurrent } = useLatestRequest();
 
   useEffect(() => {
     setDate(toISODate(addDays(todayInTimezone(selectedDivision?.timezone), -1)));
   }, [selectedDivision]);
+
+  useEffect(() => {
+    apiGet("/api/settings")
+      .then((data) => setLookbackWeeks(data.settings?.scheduleHistoryLookbackWeeks ?? DEFAULT_LOOKBACK_WEEKS))
+      .catch(() => {});
+  }, []);
+
+  const minDate = toISODate(addDays(todayInTimezone(selectedDivision?.timezone), -lookbackWeeks * 7));
 
   useEffect(() => {
     if (!selectedDivision || !date) return;
@@ -68,16 +79,22 @@ const ScheduleHistory = () => {
           <h2 className="text-lg font-semibold text-slate-900">Schedule History</h2>
           <p className="mt-1 text-sm text-slate-500">Open one past operating day and correct its final disposition when needed.</p>
         </div>
-        <label className="text-sm text-slate-600">
-          Schedule date
-          <input
-            type="date"
-            value={date}
-            max={yesterday}
-            onChange={(event) => setDate(event.target.value)}
-            className="mt-1 block rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-          />
-        </label>
+        <div>
+          <label className="text-sm text-slate-600">
+            Schedule date
+            <input
+              type="date"
+              value={date}
+              min={minDate}
+              max={yesterday}
+              onChange={(event) => setDate(event.target.value)}
+              className="mt-1 block rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            />
+          </label>
+          <p className="mt-1 text-xs text-slate-400">
+            Up to {lookbackWeeks} week{lookbackWeeks === 1 ? "" : "s"} back — adjustable in Settings.
+          </p>
+        </div>
       </div>
 
       {!loading && (

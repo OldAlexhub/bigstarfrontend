@@ -8,6 +8,8 @@ vi.mock("react-router-dom", () => {
 });
 vi.mock("../../api/client", () => ({ apiGet: vi.fn(), apiPatch: vi.fn() }));
 
+const toISODate = (date) => date.toISOString().slice(0, 10);
+
 const historicalRow = {
   _id: "day-1",
   route: { _id: "route-1", code: "R1", type: "standard" },
@@ -38,4 +40,28 @@ test("Schedule History loads one past day and allows disposition-only correction
   });
   await waitFor(() => expect(apiPatch).toHaveBeenCalledWith("/api/run-cut-days/day-1", { disposition: "deployed_late" }));
   await waitFor(() => expect(screen.getByRole("tab", { name: "Dispositioned (1)" })).toBeInTheDocument());
+});
+
+test("the date picker's earliest selectable day follows the configured lookback setting", async () => {
+  apiGet.mockImplementation((path) => {
+    if (path.startsWith("/api/settings")) return Promise.resolve({ settings: { scheduleHistoryLookbackWeeks: 5 } });
+    return Promise.resolve({ runCutDays: [] });
+  });
+
+  render(<ScheduleHistory />);
+  await screen.findByText(/Up to 5 weeks back/);
+
+  const date = screen.getByLabelText("Schedule date");
+  const expectedMin = toISODate(new Date(new Date(date.max).getTime() - (5 * 7 - 1) * 86_400_000));
+  expect(date.min).toBe(expectedMin);
+});
+
+test("falls back to a six-week lookback when Settings is unavailable", async () => {
+  apiGet.mockImplementation((path) => {
+    if (path.startsWith("/api/settings")) return Promise.reject(new Error("No access"));
+    return Promise.resolve({ runCutDays: [] });
+  });
+
+  render(<ScheduleHistory />);
+  expect(await screen.findByText(/Up to 6 weeks back/)).toBeInTheDocument();
 });

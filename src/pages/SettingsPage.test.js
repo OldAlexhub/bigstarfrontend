@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { apiDelete, apiGet, apiPatch } from "../api/client";
+import { apiDelete, apiGet, apiPatch, apiPut } from "../api/client";
 import SettingsPage from "./SettingsPage";
 
 vi.mock("../context/AuthContext", () => ({
@@ -35,6 +35,7 @@ describe("division lifecycle settings", () => {
   beforeEach(() => {
     apiGet.mockReset();
     apiPatch.mockReset();
+    apiPut.mockReset();
     apiDelete.mockReset();
     apiDelete.mockResolvedValue({ deletedDivisionId: "division-active" });
     apiGet.mockImplementation((path) => {
@@ -124,5 +125,33 @@ describe("division lifecycle settings", () => {
       { confirmationCode: "DIV_1" }
     ));
     await waitFor(() => expect(screen.queryByDisplayValue("Division One")).not.toBeInTheDocument());
+  });
+
+  test("ELT can save the Schedule History lookback weeks along with the other company defaults", async () => {
+    apiPut.mockResolvedValue({
+      settings: {
+        breakMinutes: 30,
+        revenueRatio: 0.9,
+        osrAdvanceDays: 7,
+        scheduleHistoryLookbackWeeks: 5,
+        operationsReportingStartMonth: "2026-01",
+      },
+    });
+    render(<MemoryRouter><SettingsPage /></MemoryRouter>);
+
+    await screen.findByDisplayValue("Division One");
+    const weeksLabel = screen.getByText("Schedule History lookback weeks");
+    const weeksInput = weeksLabel.closest("label").querySelector("input");
+    expect(weeksInput).toHaveValue(6);
+
+    fireEvent.change(weeksInput, { target: { value: "5" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save defaults" }));
+
+    await waitFor(() =>
+      expect(apiPut).toHaveBeenCalledWith(
+        "/api/settings",
+        expect.objectContaining({ scheduleHistoryLookbackWeeks: 5 })
+      )
+    );
   });
 });

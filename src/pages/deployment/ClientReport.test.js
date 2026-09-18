@@ -1,6 +1,6 @@
 import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { apiGet } from "../../api/client";
+import { apiGet, apiDownload } from "../../api/client";
 import ClientReport from "./ClientReport";
 
 vi.mock("react-router-dom", () => {
@@ -13,7 +13,7 @@ vi.mock("react-router-dom", () => {
   return { useOutletContext: () => ({ selectedDivision }) };
 });
 
-vi.mock("../../api/client", () => ({ apiGet: vi.fn(), apiPost: vi.fn() }));
+vi.mock("../../api/client", () => ({ apiGet: vi.fn(), apiPost: vi.fn(), apiDownload: vi.fn() }));
 
 const baseReport = {
   division: { id: "division-1", code: "DIV_10", name: "Division 10" },
@@ -68,5 +68,38 @@ describe("Client Report updates", () => {
       )
     ).toBeInTheDocument();
     await waitFor(() => expect(apiGet).toHaveBeenCalledWith(expect.stringContaining("mode=updates")));
+  });
+});
+
+describe("Client Report work order", () => {
+  beforeEach(() => {
+    apiGet.mockReset();
+    apiDownload.mockReset();
+    apiGet.mockResolvedValue({ ...baseReport, rows: [] });
+    apiDownload.mockResolvedValue({ blob: new Blob(["data"]), filename: "DIV_10_WO_091326_091926.xlsx" });
+  });
+
+  test("downloads a 7-day work order for the chosen start date without fetching the daily schedule", async () => {
+    const createObjectURL = vi.spyOn(window.URL, "createObjectURL").mockReturnValue("blob:work-order");
+    const revokeObjectURL = vi.spyOn(window.URL, "revokeObjectURL").mockImplementation(() => {});
+
+    render(<ClientReport />);
+    fireEvent.click(screen.getByRole("tab", { name: "Work Order" }));
+
+    expect(screen.queryByRole("button", { name: /Today/ })).not.toBeInTheDocument();
+    apiGet.mockClear();
+
+    fireEvent.change(screen.getByLabelText("Work order start date"), { target: { value: "2026-09-13" } });
+    fireEvent.click(screen.getByRole("button", { name: "Download Work Order" }));
+
+    await waitFor(() =>
+      expect(apiDownload).toHaveBeenCalledWith(
+        "/api/reports/work-order?division=division-1&from=2026-09-13"
+      )
+    );
+    expect(apiGet).not.toHaveBeenCalled();
+
+    createObjectURL.mockRestore();
+    revokeObjectURL.mockRestore();
   });
 });
