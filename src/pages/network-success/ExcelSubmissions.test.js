@@ -186,6 +186,31 @@ test("a confirmed submission opens as an editable revision with fresh matching",
   expect(screen.getByRole("button", { name: "Review final changes" })).toBeEnabled();
 });
 
+test("Spare submissions accept a single CSV file and reject other extensions", async () => {
+  apiGet.mockResolvedValue({ submissions: [] });
+  apiFormPost.mockResolvedValue({ submission: { ...pending, source: "spare" } });
+
+  const { container } = render(<ExcelSubmissions />);
+  fireEvent.click(await screen.findByRole("button", { name: /Spare/ }));
+  expect(await screen.findByText("Daily Duty Performance")).toBeInTheDocument();
+
+  const input = container.querySelector('input[type="file"]');
+  expect(input).toHaveAttribute("accept", ".csv");
+
+  const wrongType = new File(["data"], "duty-performance.xlsx", { type: "application/vnd.ms-excel" });
+  fireEvent.change(input, { target: { files: [wrongType] } });
+  expect(await screen.findByText(/Each file must be a \.csv file/)).toBeInTheDocument();
+
+  const csv = new File(["duty_report__duty_identifier,..."], "duty-performance.csv", { type: "text/csv" });
+  fireEvent.change(input, { target: { files: [csv] } });
+  fireEvent.click(screen.getByRole("button", { name: "Continue to matching" }));
+
+  await waitFor(() => expect(apiFormPost).toHaveBeenCalled());
+  const [, form] = apiFormPost.mock.calls[0];
+  expect(form.get("source")).toBe("spare");
+  expect(form.get("spare").name).toBe("duty-performance.csv");
+});
+
 test("recent submissions paginate three records per view", async () => {
   const submissions = Array.from({ length: 7 }, (_, index) => ({
     id: `submission-${index + 1}`,

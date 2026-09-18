@@ -56,7 +56,7 @@ const SOURCE_DEFINITIONS = {
   },
   network_raw: {
     label: "Network Success raw performance",
-    description: "Export confirmed Vision and Ecolane source rows exactly once, without rollups, scoring, or analysis.",
+    description: "Export confirmed Vision, Ecolane, and Spare source rows exactly once, without rollups, scoring, or analysis.",
     defaultSort: "date",
     fields: [
       ["divisionCode", "Division Code"],
@@ -160,7 +160,7 @@ const TEMPLATES = [
     id: "network-raw",
     eyebrow: "Raw data",
     name: "NS upload rows",
-    description: "Source-faithful Vision and Ecolane rows with no analysis.",
+    description: "Source-faithful Vision, Ecolane, and Spare rows with no analysis.",
     source: "network_raw",
     networkSource: "all",
     title: "Network Success Raw Performance Data",
@@ -567,9 +567,10 @@ const ReportBuilder = () => {
             <label className="block text-xs font-semibold text-slate-600">
               Upload source
               <select aria-label="Upload source" value={config.networkSource} onChange={(event) => setConfig({ ...config, networkSource: event.target.value })} className="mt-1.5 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal outline-none focus:border-brand-500">
-                <option value="all">Vision and Ecolane</option>
+                <option value="all">Vision, Ecolane, and Spare</option>
                 <option value="vision">Vision only</option>
                 <option value="ecolane">Ecolane only</option>
+                <option value="spare">Spare only</option>
               </select>
               <span className="mt-1.5 block font-normal leading-5 text-slate-400">Only confirmed uploaded rows are included.</span>
             </label>

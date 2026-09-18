@@ -8,17 +8,25 @@ const sources = {
   vision: {
     label: "Vision",
     description: "Paratransit Operations report",
-    files: [{ key: "vision", label: "Paratransit Operations", hint: "One .xls or .xlsx file" }],
+    files: [{ key: "vision", label: "Paratransit Operations", hint: "One .xls or .xlsx file", extensions: [".xls", ".xlsx"] }],
   },
   ecolane: {
     label: "Ecolane",
     description: "Productivity plus driver performance",
     files: [
-      { key: "productivity", label: "Daily Run Productivity", hint: "Required" },
-      { key: "driverPerformance", label: "Driver Performance", hint: "Required" },
+      { key: "productivity", label: "Daily Run Productivity", hint: "Required", extensions: [".xls", ".xlsx"] },
+      { key: "driverPerformance", label: "Driver Performance", hint: "Required", extensions: [".xls", ".xlsx"] },
     ],
   },
+  spare: {
+    label: "Spare",
+    description: "Daily Duty Performance report",
+    files: [{ key: "spare", label: "Daily Duty Performance", hint: "One .csv file", extensions: [".csv"] }],
+  },
 };
+
+const extensionPattern = (extensions) =>
+  new RegExp(`\\.(${extensions.map((extension) => extension.replace(/^\./, "")).join("|")})$`, "i");
 
 const formatDate = (value) => {
   if (!value) return "—";
@@ -30,8 +38,9 @@ const severityStyle = {
   blocker: "bg-red-50 text-red-700 ring-red-600/20",
   warning: "bg-amber-50 text-amber-700 ring-amber-600/20",
   clean: "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
+  extra: "bg-blue-50 text-blue-700 ring-blue-600/20",
 };
-const severityLabel = { blocker: "Needs action", warning: "Review", clean: "Matched" };
+const severityLabel = { blocker: "Needs action", warning: "Review", clean: "Matched", extra: "Extra revenue route" };
 
 const Stepper = ({ current }) => (
   <ol aria-label="Submission progress" className="mb-7 grid grid-cols-3 gap-2">
@@ -70,7 +79,7 @@ const FilePicker = ({ definition, file, onChange }) => (
     <input
       className="sr-only"
       type="file"
-      accept=".xls,.xlsx"
+      accept={(definition.extensions || [".xls", ".xlsx"]).join(",")}
       onChange={(event) => onChange(event.target.files?.[0] || null)}
     />
   </label>
@@ -372,8 +381,10 @@ const ExcelSubmissions = () => {
   const requiredFilesReady = sources[source].files.every((file) => files[file.key]);
   const setFile = (key, file) => {
     setError("");
-    if (file && (!/\.xlsx?$/i.test(file.name) || file.size > 10 * 1024 * 1024)) {
-      setError("Each file must be an .xls or .xlsx workbook no larger than 10 MB.");
+    const definition = sources[source].files.find((entry) => entry.key === key);
+    const extensions = definition?.extensions || [".xls", ".xlsx"];
+    if (file && (!extensionPattern(extensions).test(file.name) || file.size > 10 * 1024 * 1024)) {
+      setError(`Each file must be a ${extensions.join(" or ")} file no larger than 10 MB.`);
       return;
     }
     setFiles((current) => ({ ...current, [key]: file }));
@@ -610,7 +621,7 @@ const ExcelSubmissions = () => {
               <h2 className="text-lg font-semibold text-slate-900">Choose the source system</h2>
               <p className="mt-1 text-sm text-slate-500">Files are parsed for review; workbook binaries are never retained.</p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-3">
               {Object.entries(sources).map(([key, option]) => (
                 <button
                   key={key}
@@ -629,7 +640,9 @@ const ExcelSubmissions = () => {
                 <FilePicker key={definition.key} definition={definition} file={files[definition.key]} onChange={(file) => setFile(definition.key, file)} />
               ))}
               <div className="flex items-center justify-between gap-4 pt-1">
-                <p className="text-xs text-slate-500">.xls or .xlsx · 10 MB maximum per file</p>
+                <p className="text-xs text-slate-500">
+                  {[...new Set(sources[source].files.flatMap((file) => file.extensions || []))].join(", ")} · 10 MB maximum per file
+                </p>
                 <button
                   type="button"
                   disabled={!requiredFilesReady || busy}
@@ -759,7 +772,7 @@ const ExcelSubmissions = () => {
             </div>
             <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
               <p className="font-medium text-slate-800">Replacement scope</p>
-              <p className="mt-1">Current {source === "vision" ? "Vision" : "Ecolane"} records for {submission.reportDates.map(formatDate).join(", ")} in the confirmed division will be replaced. The before/after change audit remains attached to this submission.</p>
+              <p className="mt-1">Current {sources[source]?.label || source} records for {submission.reportDates.map(formatDate).join(", ")} in the confirmed division will be replaced. The before/after change audit remains attached to this submission.</p>
             </div>
             <div className="mt-5 overflow-hidden rounded-xl border border-slate-200">
               <div className="border-b border-slate-100 bg-white px-4 py-3">
