@@ -410,6 +410,7 @@ const emptyExtra = {
   routeCode: "",
   operatorId: "",
   vehicleId: "",
+  pulloutAddress: "",
   startTime: "",
   endTime: "",
   notes: "",
@@ -480,7 +481,7 @@ const LiveSchedule = () => {
   useEffect(() => {
     if (!selectedDivision) return;
     const requestId = operatorsRequest.begin();
-    apiGet(`/api/operators?division=${selectedDivision._id}`)
+    apiGet(`/api/operators?division=${selectedDivision._id}&sharedStandby=1`)
       .then((data) => {
         if (operatorsRequest.isCurrent(requestId)) setOperators(data.operators || []);
       })
@@ -533,7 +534,9 @@ const LiveSchedule = () => {
   useEffect(() => {
     if (!selectedDivision) return;
     const requestId = standbyOperatorsRequest.begin();
-    apiGet(`/api/run-cut-days?division=${selectedDivision._id}&from=${dateStr}&to=${dateStr}&includeStandby=1`)
+    apiGet(
+      `/api/run-cut-days?division=${selectedDivision._id}&from=${dateStr}&to=${dateStr}&includeStandby=1&sharedStandby=1`
+    )
       .then((data) => {
         if (!standbyOperatorsRequest.isCurrent(requestId)) return;
         const ids = (data.runCutDays || [])
@@ -584,6 +587,7 @@ const LiveSchedule = () => {
         ...(useNewRouteNumber ? { routeCode: newExtra.routeCode } : { routeId: newExtra.routeId }),
         operatorId: newExtra.operatorId,
         vehicleId: newExtra.vehicleId,
+        pulloutAddress: newExtra.pulloutAddress,
         startTime: newExtra.startTime || null,
         endTime: newExtra.endTime || null,
         notes: newExtra.notes,
@@ -671,6 +675,7 @@ const LiveSchedule = () => {
                       routeId,
                       operatorId: assignment?.operator?._id || "",
                       vehicleId: assignment?.vehicle?._id || "",
+                      pulloutAddress: assignment?.pulloutAddress || "",
                       startTime: assignment?.startTime || "",
                       endTime: assignment?.endTime || "",
                     });
@@ -699,7 +704,15 @@ const LiveSchedule = () => {
               Driver
               <select
                 value={newExtra.operatorId}
-                onChange={(e) => setNewExtra({ ...newExtra, operatorId: e.target.value })}
+                onChange={(e) => {
+                  const operatorId = e.target.value;
+                  const operatorDoc = operators.find((operator) => operator._id === operatorId);
+                  setNewExtra({
+                    ...newExtra,
+                    operatorId,
+                    pulloutAddress: operatorDoc?.pulloutAddress || "",
+                  });
+                }}
                 className="mt-1 block w-48 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm"
               >
                 <option value="">Unassigned</option>
@@ -735,10 +748,10 @@ const LiveSchedule = () => {
             <label className="text-sm text-slate-600">
               Pullout address
               <input
-                value={operators.find((operator) => operator._id === newExtra.operatorId)?.pulloutAddress || ""}
-                readOnly
-                placeholder="Set by driver"
-                className="mt-1 block w-56 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-600"
+                value={newExtra.pulloutAddress}
+                onChange={(e) => setNewExtra({ ...newExtra, pulloutAddress: e.target.value })}
+                placeholder="Auto-filled from driver; edit if needed"
+                className="mt-1 block w-56 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
               />
             </label>
             <label className="text-sm text-slate-600">

@@ -260,6 +260,45 @@ describe("Live Schedule today route tabs", () => {
         expect.objectContaining({ routeId: "route-3", notes: "Added demand" })
       )
     );
+    expect(apiGet).toHaveBeenCalledWith(expect.stringContaining("/api/operators?division=division-1&sharedStandby=1"));
+  });
+
+  test("the pullout address auto-fills from the selected driver but can be adjusted before submitting", async () => {
+    apiGet.mockImplementation((url) => {
+      if (url.startsWith("/api/run-cut-days")) return Promise.resolve({ runCutDays: storedRows });
+      if (url.startsWith("/api/routes")) {
+        return Promise.resolve({ routes: [{ _id: "route-3", code: "EXTRA-3" }] });
+      }
+      if (url.startsWith("/api/run-cuts")) return Promise.resolve({ runCuts: [] });
+      if (url.startsWith("/api/operators")) {
+        return Promise.resolve({
+          operators: [
+            { _id: "operator-shared", name: "Sydney Austen", pulloutAddress: "North & South Central Plano", active: true },
+          ],
+        });
+      }
+      if (url.startsWith("/api/vehicles")) return Promise.resolve({ vehicles: [] });
+      if (url.startsWith("/api/settings")) return Promise.resolve({ settings: { osrAdvanceDays: 7 } });
+      return Promise.reject(new Error(`Unexpected request: ${url}`));
+    });
+
+    render(<LiveSchedule />);
+    fireEvent.click(await screen.findByRole("button", { name: "+ Add Revenue Route" }));
+
+    fireEvent.change(screen.getByLabelText("Revenue route"), { target: { value: "route-3" } });
+    fireEvent.change(screen.getByLabelText("Driver"), { target: { value: "operator-shared" } });
+    expect(screen.getByLabelText("Pullout address")).toHaveValue("North & South Central Plano");
+
+    fireEvent.change(screen.getByLabelText("Pullout address"), { target: { value: "Adjusted pickup spot" } });
+    fireEvent.change(screen.getByLabelText("Notes"), { target: { value: "Standby covers a new route" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add revenue route" }));
+
+    await waitFor(() =>
+      expect(apiPost).toHaveBeenCalledWith(
+        "/api/run-cut-days",
+        expect.objectContaining({ operatorId: "operator-shared", pulloutAddress: "Adjusted pickup spot" })
+      )
+    );
   });
 
   test("a made-up route number can be sent for a one-day-only revenue route", async () => {
