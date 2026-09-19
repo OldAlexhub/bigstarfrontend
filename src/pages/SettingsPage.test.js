@@ -20,7 +20,7 @@ const activeDivision = {
   name: "Division One",
   active: true,
   timezone: "America/New_York",
-  thresholds: { breakMinutes: null, revenueRatio: null },
+  thresholds: { breakMinutes: 30, revenueRatio: 0.9 },
 };
 const retiredDivision = {
   _id: "division-retired",
@@ -28,7 +28,7 @@ const retiredDivision = {
   name: "Division Two",
   active: false,
   timezone: "America/Chicago",
-  thresholds: { breakMinutes: null, revenueRatio: null },
+  thresholds: { breakMinutes: 30, revenueRatio: 0.9 },
 };
 
 describe("division lifecycle settings", () => {
@@ -42,8 +42,6 @@ describe("division lifecycle settings", () => {
       if (path === "/api/settings") {
         return Promise.resolve({
           settings: {
-            breakMinutes: 30,
-            revenueRatio: 0.9,
             osrAdvanceDays: 7,
             operationsReportingStartMonth: "2026-01",
           },
@@ -104,6 +102,66 @@ describe("division lifecycle settings", () => {
     ));
   });
 
+  test("break minutes and revenue ratio are controlled per division, with no shared company default", async () => {
+    render(<MemoryRouter><SettingsPage /></MemoryRouter>);
+
+    const nameInput = await screen.findByLabelText("Division name for DIV_1");
+    expect(screen.queryByLabelText("Break minutes")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Revenue ratio")).not.toBeInTheDocument();
+
+    const activeRow = nameInput.closest("tr");
+    const [breakMinutesInput, revenueRatioInput] = within(activeRow).getAllByRole("spinbutton");
+    expect(breakMinutesInput).toHaveValue(30);
+    expect(revenueRatioInput).toHaveValue(0.9);
+
+    fireEvent.change(breakMinutesInput, { target: { value: "45" } });
+    fireEvent.click(within(activeRow).getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(apiPatch).toHaveBeenCalledWith(
+        "/api/divisions/division-active",
+        expect.objectContaining({
+          thresholds: { breakMinutes: 45, revenueRatio: 0.9, effectiveDate: expect.any(String) },
+        })
+      )
+    );
+  });
+
+  test("a break minutes / revenue ratio change can be scheduled for a future start date", async () => {
+    render(<MemoryRouter><SettingsPage /></MemoryRouter>);
+
+    const nameInput = await screen.findByLabelText("Division name for DIV_1");
+    const activeRow = nameInput.closest("tr");
+    const dateInput = within(activeRow).getByLabelText("Break minutes / revenue ratio start date for DIV_1");
+    fireEvent.change(dateInput, { target: { value: "2099-01-01" } });
+    fireEvent.click(within(activeRow).getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(apiPatch).toHaveBeenCalledWith(
+        "/api/divisions/division-active",
+        expect.objectContaining({
+          thresholds: { breakMinutes: 30, revenueRatio: 0.9, effectiveDate: "2099-01-01" },
+        })
+      )
+    );
+  });
+
+  test("clearing a division's break minutes or revenue ratio blocks saving instead of falling back to a default", async () => {
+    render(<MemoryRouter><SettingsPage /></MemoryRouter>);
+
+    const nameInput = await screen.findByLabelText("Division name for DIV_1");
+    const activeRow = nameInput.closest("tr");
+    const [breakMinutesInput] = within(activeRow).getAllByRole("spinbutton");
+
+    fireEvent.change(breakMinutesInput, { target: { value: "" } });
+    fireEvent.click(within(activeRow).getByRole("button", { name: "Save" }));
+
+    expect(
+      await screen.findByText("Break minutes and revenue ratio are required for every division.")
+    ).toBeInTheDocument();
+    expect(apiPatch).not.toHaveBeenCalled();
+  });
+
   test("ELT deletion requires the division code and removes the division", async () => {
     render(<MemoryRouter><SettingsPage /></MemoryRouter>);
 
@@ -130,8 +188,6 @@ describe("division lifecycle settings", () => {
   test("ELT can save the Schedule History lookback weeks along with the other company defaults", async () => {
     apiPut.mockResolvedValue({
       settings: {
-        breakMinutes: 30,
-        revenueRatio: 0.9,
         osrAdvanceDays: 7,
         scheduleHistoryLookbackWeeks: 5,
         operationsReportingStartMonth: "2026-01",

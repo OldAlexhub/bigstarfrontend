@@ -12,6 +12,8 @@ const thisMonth = () => {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 7);
 };
 
+const todayIso = () => new Date().toISOString().slice(0, 10);
+
 const OperationsKpiSettings = ({ divisions }) => {
   const [definitions, setDefinitions] = useState([]);
   const [history, setHistory] = useState([]);
@@ -116,6 +118,7 @@ const SettingsPage = () => {
 
   const [settings, setSettings] = useState(null);
   const [divisions, setDivisions] = useState([]);
+  const [thresholdEffectiveDates, setThresholdEffectiveDates] = useState({});
   const [error, setError] = useState("");
   const [savedMessage, setSavedMessage] = useState("");
   const [lifecycleBusyId, setLifecycleBusyId] = useState("");
@@ -143,8 +146,6 @@ const SettingsPage = () => {
     e.preventDefault();
     try {
       const data = await apiPut("/api/settings", {
-        breakMinutes: Number(settings.breakMinutes),
-        revenueRatio: Number(settings.revenueRatio),
         osrAdvanceDays: Number(settings.osrAdvanceDays ?? 7),
         scheduleHistoryLookbackWeeks: Number(settings.scheduleHistoryLookbackWeeks ?? 6),
         operationsReportingStartMonth: settings.operationsReportingStartMonth,
@@ -162,6 +163,10 @@ const SettingsPage = () => {
         d._id === id ? { ...d, thresholds: { ...d.thresholds, [field]: value } } : d
       )
     );
+  };
+
+  const handleThresholdEffectiveDateChange = (id, value) => {
+    setThresholdEffectiveDates((prev) => ({ ...prev, [id]: value }));
   };
 
   const handleDivisionTimezoneChange = (id, value) => {
@@ -185,18 +190,22 @@ const SettingsPage = () => {
       setError("Division name is required.");
       return;
     }
+    if (
+      division.thresholds?.breakMinutes === "" ||
+      division.thresholds?.breakMinutes === null ||
+      division.thresholds?.revenueRatio === "" ||
+      division.thresholds?.revenueRatio === null
+    ) {
+      setError("Break minutes and revenue ratio are required for every division.");
+      return;
+    }
     try {
       const data = await apiPatch(`/api/divisions/${division._id}`, {
         ...(isELT ? { name: division.name.trim() } : {}),
         thresholds: {
-          breakMinutes:
-            division.thresholds.breakMinutes === "" || division.thresholds.breakMinutes === null
-              ? null
-              : Number(division.thresholds.breakMinutes),
-          revenueRatio:
-            division.thresholds.revenueRatio === "" || division.thresholds.revenueRatio === null
-              ? null
-              : Number(division.thresholds.revenueRatio),
+          breakMinutes: Number(division.thresholds.breakMinutes),
+          revenueRatio: Number(division.thresholds.revenueRatio),
+          effectiveDate: thresholdEffectiveDates[division._id] || todayIso(),
         },
         timezone: division.timezone,
         pulloutAddressRules: {
@@ -205,6 +214,11 @@ const SettingsPage = () => {
         },
       });
       setDivisions((prev) => prev.map((d) => (d._id === division._id ? data.division : d)));
+      setThresholdEffectiveDates((prev) => {
+        const next = { ...prev };
+        delete next[division._id];
+        return next;
+      });
       flashSaved();
     } catch (err) {
       setError(err.message);
@@ -302,27 +316,6 @@ const SettingsPage = () => {
         <form onSubmit={handleSettingsSave}>
           <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
             <label className="text-sm text-slate-600">
-              Break minutes
-              <input
-                type="number"
-                disabled={!isELT}
-                value={settings.breakMinutes}
-                onChange={(e) => setSettings({ ...settings, breakMinutes: e.target.value })}
-                className={`${inputClasses} mt-1 block`}
-              />
-            </label>
-            <label className="text-sm text-slate-600">
-              Revenue ratio
-              <input
-                type="number"
-                step="0.01"
-                disabled={!isELT}
-                value={settings.revenueRatio}
-                onChange={(e) => setSettings({ ...settings, revenueRatio: e.target.value })}
-                className={`${inputClasses} mt-1 block`}
-              />
-            </label>
-            <label className="text-sm text-slate-600">
               OSR advance days
               <input
                 type="number"
@@ -382,7 +375,7 @@ const SettingsPage = () => {
       <div className="rounded-xl border border-slate-200 bg-white p-6">
         <h2 className="mb-2 text-sm font-semibold text-slate-900">Division settings and lifecycle</h2>
         <p className="mb-4 text-xs text-slate-400">
-          Leave overrides blank to use company defaults. Retiring preserves history; permanent deletion removes the division and all of its records.
+          Break minutes and revenue ratio are set independently per division — there's no shared company default, since standards can diverge over time even when they currently match. A change takes effect from the "Starts" date (today by default); dates before it, including already-reported history, are never recalculated. Retiring preserves history; permanent deletion removes the division and all of its records.
         </p>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 text-sm">
@@ -391,6 +384,7 @@ const SettingsPage = () => {
                 <th className="px-3 py-2 text-left font-medium text-slate-500">Division</th>
                 <th className="px-3 py-2 text-left font-medium text-slate-500">Break minutes</th>
                 <th className="px-3 py-2 text-left font-medium text-slate-500">Revenue ratio</th>
+                <th className="px-3 py-2 text-left font-medium text-slate-500">Starts</th>
                 <th className="px-3 py-2 text-left font-medium text-slate-500">Timezone</th>
                 <th className="px-3 py-2 text-left font-medium text-slate-500">Status</th>
                 <th className="px-3 py-2" />
@@ -430,6 +424,16 @@ const SettingsPage = () => {
                       value={d.thresholds?.revenueRatio ?? ""}
                       onChange={(e) => handleDivisionThresholdChange(d._id, "revenueRatio", e.target.value)}
                       className={inputClasses}
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <input
+                      type="date"
+                      aria-label={`Break minutes / revenue ratio start date for ${d.code}`}
+                      disabled={d.active === false}
+                      value={thresholdEffectiveDates[d._id] ?? todayIso()}
+                      onChange={(e) => handleThresholdEffectiveDateChange(d._id, e.target.value)}
+                      className="rounded-md border border-slate-300 px-2 py-1.5 text-sm disabled:bg-slate-100"
                     />
                   </td>
                   <td className="px-3 py-2">
