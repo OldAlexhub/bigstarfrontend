@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { apiDelete, apiGet, apiPatch, apiPut } from "../api/client";
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "../api/client";
 import SettingsPage from "./SettingsPage";
 
 vi.mock("../context/AuthContext", () => ({
@@ -10,6 +10,7 @@ vi.mock("../context/AuthContext", () => ({
 vi.mock("../api/client", () => ({
   apiGet: vi.fn(),
   apiPatch: vi.fn(),
+  apiPost: vi.fn(),
   apiPut: vi.fn(),
   apiDelete: vi.fn(),
 }));
@@ -35,6 +36,7 @@ describe("division lifecycle settings", () => {
   beforeEach(() => {
     apiGet.mockReset();
     apiPatch.mockReset();
+    apiPost.mockReset();
     apiPut.mockReset();
     apiDelete.mockReset();
     apiDelete.mockResolvedValue({ deletedDivisionId: "division-active" });
@@ -50,6 +52,19 @@ describe("division lifecycle settings", () => {
       if (path === "/api/divisions?includeInactive=1") {
         return Promise.resolve({ divisions: [activeDivision, retiredDivision] });
       }
+      if (path === "/api/divisions/thresholds") {
+        return Promise.resolve({
+          thresholds: [
+            {
+              _id: "threshold-active-original",
+              division: "division-active",
+              effectiveDate: "2026-01-01T00:00:00.000Z",
+              breakMinutes: 30,
+              revenueRatio: 0.9,
+            },
+          ],
+        });
+      }
       if (path === "/api/settings/operations-kpis") {
         return Promise.resolve({ definitions: [], settings: [] });
       }
@@ -59,6 +74,11 @@ describe("division lifecycle settings", () => {
     apiPatch.mockImplementation((path, body) => {
       const source = path.includes("division-active") ? activeDivision : retiredDivision;
       return Promise.resolve({ division: { ...source, active: body.active } });
+    });
+    apiPost.mockResolvedValue({
+      division: activeDivision,
+      changed: true,
+      thresholds: [],
     });
   });
 
@@ -102,7 +122,7 @@ describe("division lifecycle settings", () => {
     ));
   });
 
-  test("break minutes and revenue ratio are controlled per division, with no shared company default", async () => {
+  test("a division can add another dated break and revenue setting without replacing its history", async () => {
     render(<MemoryRouter><SettingsPage /></MemoryRouter>);
 
     const nameInput = await screen.findByLabelText("Division name for DIV_1");
@@ -110,19 +130,23 @@ describe("division lifecycle settings", () => {
     expect(screen.queryByLabelText("Revenue ratio")).not.toBeInTheDocument();
 
     const activeRow = nameInput.closest("tr");
-    const [breakMinutesInput, revenueRatioInput] = within(activeRow).getAllByRole("spinbutton");
+    expect(within(activeRow).getByText("30")).toBeInTheDocument();
+    expect(within(activeRow).getByText("0.9")).toBeInTheDocument();
+
+    fireEvent.click(within(activeRow).getByRole("button", { name: /View schedule/ }));
+    expect(screen.getByText("2026-01-01")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Add change" }));
+    const breakMinutesInput = screen.getByLabelText("New break minutes for DIV_1");
+    const revenueRatioInput = screen.getByLabelText("New revenue ratio for DIV_1");
     expect(breakMinutesInput).toHaveValue(30);
     expect(revenueRatioInput).toHaveValue(0.9);
-
     fireEvent.change(breakMinutesInput, { target: { value: "45" } });
-    fireEvent.click(within(activeRow).getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save change" }));
 
     await waitFor(() =>
-      expect(apiPatch).toHaveBeenCalledWith(
-        "/api/divisions/division-active",
-        expect.objectContaining({
-          thresholds: { breakMinutes: 45, revenueRatio: 0.9, effectiveDate: expect.any(String) },
-        })
+      expect(apiPost).toHaveBeenCalledWith(
+        "/api/divisions/division-active/thresholds",
+        { breakMinutes: 45, revenueRatio: 0.9, effectiveDate: expect.any(String) }
       )
     );
   });
@@ -132,16 +156,16 @@ describe("division lifecycle settings", () => {
 
     const nameInput = await screen.findByLabelText("Division name for DIV_1");
     const activeRow = nameInput.closest("tr");
-    const dateInput = within(activeRow).getByLabelText("Break minutes / revenue ratio start date for DIV_1");
+    fireEvent.click(within(activeRow).getByRole("button", { name: /View schedule/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Add change" }));
+    const dateInput = screen.getByLabelText("New settings start date for DIV_1");
     fireEvent.change(dateInput, { target: { value: "2099-01-01" } });
-    fireEvent.click(within(activeRow).getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save change" }));
 
     await waitFor(() =>
-      expect(apiPatch).toHaveBeenCalledWith(
-        "/api/divisions/division-active",
-        expect.objectContaining({
-          thresholds: { breakMinutes: 30, revenueRatio: 0.9, effectiveDate: "2099-01-01" },
-        })
+      expect(apiPost).toHaveBeenCalledWith(
+        "/api/divisions/division-active/thresholds",
+        { breakMinutes: 30, revenueRatio: 0.9, effectiveDate: "2099-01-01" }
       )
     );
   });
@@ -151,15 +175,17 @@ describe("division lifecycle settings", () => {
 
     const nameInput = await screen.findByLabelText("Division name for DIV_1");
     const activeRow = nameInput.closest("tr");
-    const [breakMinutesInput] = within(activeRow).getAllByRole("spinbutton");
+    fireEvent.click(within(activeRow).getByRole("button", { name: /View schedule/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Add change" }));
+    const breakMinutesInput = screen.getByLabelText("New break minutes for DIV_1");
 
     fireEvent.change(breakMinutesInput, { target: { value: "" } });
-    fireEvent.click(within(activeRow).getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save change" }));
 
     expect(
       await screen.findByText("Break minutes and revenue ratio are required for every division.")
     ).toBeInTheDocument();
-    expect(apiPatch).not.toHaveBeenCalled();
+    expect(apiPost).not.toHaveBeenCalled();
   });
 
   test("ELT deletion requires the division code and removes the division", async () => {

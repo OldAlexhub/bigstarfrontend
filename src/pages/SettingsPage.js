@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { apiDelete, apiGet, apiPatch, apiPut } from "../api/client";
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "../api/client";
 import { TIMEZONES } from "../utils/dates";
 
 const inputClasses =
@@ -12,7 +12,23 @@ const thisMonth = () => {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 7);
 };
 
-const todayIso = () => new Date().toISOString().slice(0, 10);
+const todayIso = (timeZone) => {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(new Date());
+    const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    return `${value.year}-${value.month}-${value.day}`;
+  } catch {
+    const date = new Date();
+    return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  }
+};
+
+const thresholdDate = (entry) => String(entry?.effectiveDate || "").slice(0, 10);
 
 const OperationsKpiSettings = ({ divisions }) => {
   const [definitions, setDefinitions] = useState([]);
@@ -118,7 +134,10 @@ const SettingsPage = () => {
 
   const [settings, setSettings] = useState(null);
   const [divisions, setDivisions] = useState([]);
-  const [thresholdEffectiveDates, setThresholdEffectiveDates] = useState({});
+  const [thresholdHistory, setThresholdHistory] = useState([]);
+  const [expandedThresholds, setExpandedThresholds] = useState({});
+  const [thresholdDrafts, setThresholdDrafts] = useState({});
+  const [thresholdBusyId, setThresholdBusyId] = useState("");
   const [error, setError] = useState("");
   const [savedMessage, setSavedMessage] = useState("");
   const [lifecycleBusyId, setLifecycleBusyId] = useState("");
@@ -127,10 +146,15 @@ const SettingsPage = () => {
 
   const load = () => {
     const divisionsPath = isELT ? "/api/divisions?includeInactive=1" : "/api/divisions";
-    Promise.all([apiGet("/api/settings"), apiGet(divisionsPath)])
-      .then(([settingsData, divisionsData]) => {
+    Promise.all([
+      apiGet("/api/settings"),
+      apiGet(divisionsPath),
+      apiGet("/api/divisions/thresholds"),
+    ])
+      .then(([settingsData, divisionsData, thresholdData]) => {
         setSettings(settingsData.settings);
         setDivisions(divisionsData.divisions);
+        setThresholdHistory(thresholdData.thresholds || []);
       })
       .catch((err) => setError(err.message));
   };
@@ -157,16 +181,74 @@ const SettingsPage = () => {
     }
   };
 
-  const handleDivisionThresholdChange = (id, field, value) => {
-    setDivisions((prev) =>
-      prev.map((d) =>
-        d._id === id ? { ...d, thresholds: { ...d.thresholds, [field]: value } } : d
-      )
-    );
+  const historyForDivision = (divisionId) => thresholdHistory
+    .filter((entry) => String(entry.division?._id || entry.division) === String(divisionId))
+    .sort((a, b) => thresholdDate(b).localeCompare(thresholdDate(a)));
+
+  const openThresholdEditor = (division, entry = null) => {
+    const startDate = entry ? thresholdDate(entry) : todayIso(division.timezone);
+    setExpandedThresholds((current) => ({ ...current, [division._id]: true }));
+    setThresholdDrafts((current) => ({
+      ...current,
+      [division._id]: {
+        breakMinutes: entry?.breakMinutes ?? division.thresholds?.breakMinutes ?? "",
+        revenueRatio: entry?.revenueRatio ?? division.thresholds?.revenueRatio ?? "",
+        effectiveDate: startDate,
+      },
+    }));
   };
 
-  const handleThresholdEffectiveDateChange = (id, value) => {
-    setThresholdEffectiveDates((prev) => ({ ...prev, [id]: value }));
+  const handleThresholdDraftChange = (divisionId, field, value) => {
+    setThresholdDrafts((current) => ({
+      ...current,
+      [divisionId]: { ...current[divisionId], [field]: value },
+    }));
+  };
+
+  const handleThresholdSave = async (division) => {
+    const draft = thresholdDrafts[division._id];
+    if (
+      !draft ||
+      draft.breakMinutes === "" ||
+      draft.breakMinutes === null ||
+      draft.revenueRatio === "" ||
+      draft.revenueRatio === null
+    ) {
+      setError("Break minutes and revenue ratio are required for every division.");
+      return;
+    }
+    if (!draft.effectiveDate || draft.effectiveDate < todayIso(division.timezone)) {
+      setError("The start date cannot be in the past. Past settings are locked to preserve reported history.");
+      return;
+    }
+
+    setThresholdBusyId(division._id);
+    setError("");
+    try {
+      const data = await apiPost(`/api/divisions/${division._id}/thresholds`, {
+        breakMinutes: Number(draft.breakMinutes),
+        revenueRatio: Number(draft.revenueRatio),
+        effectiveDate: draft.effectiveDate,
+      });
+      setDivisions((current) => current.map((item) => (
+        item._id === division._id ? data.division : item
+      )));
+      setThresholdHistory((current) => [
+        ...current.filter((entry) => String(entry.division?._id || entry.division) !== String(division._id)),
+        ...(data.thresholds || []),
+      ]);
+      setThresholdDrafts((current) => {
+        const next = { ...current };
+        delete next[division._id];
+        return next;
+      });
+      setSavedMessage(data.changed === false ? "That setting is already in effect" : "Dated setting saved");
+      setTimeout(() => setSavedMessage(""), 2000);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setThresholdBusyId("");
+    }
   };
 
   const handleDivisionTimezoneChange = (id, value) => {
@@ -190,23 +272,9 @@ const SettingsPage = () => {
       setError("Division name is required.");
       return;
     }
-    if (
-      division.thresholds?.breakMinutes === "" ||
-      division.thresholds?.breakMinutes === null ||
-      division.thresholds?.revenueRatio === "" ||
-      division.thresholds?.revenueRatio === null
-    ) {
-      setError("Break minutes and revenue ratio are required for every division.");
-      return;
-    }
     try {
       const data = await apiPatch(`/api/divisions/${division._id}`, {
         ...(isELT ? { name: division.name.trim() } : {}),
-        thresholds: {
-          breakMinutes: Number(division.thresholds.breakMinutes),
-          revenueRatio: Number(division.thresholds.revenueRatio),
-          effectiveDate: thresholdEffectiveDates[division._id] || todayIso(),
-        },
         timezone: division.timezone,
         pulloutAddressRules: {
           standbyKeepsRouteAddress: Boolean(division.pulloutAddressRules?.standbyKeepsRouteAddress),
@@ -214,11 +282,6 @@ const SettingsPage = () => {
         },
       });
       setDivisions((prev) => prev.map((d) => (d._id === division._id ? data.division : d)));
-      setThresholdEffectiveDates((prev) => {
-        const next = { ...prev };
-        delete next[division._id];
-        return next;
-      });
       flashSaved();
     } catch (err) {
       setError(err.message);
@@ -382,17 +445,22 @@ const SettingsPage = () => {
             <thead>
               <tr>
                 <th className="px-3 py-2 text-left font-medium text-slate-500">Division</th>
-                <th className="px-3 py-2 text-left font-medium text-slate-500">Break minutes</th>
-                <th className="px-3 py-2 text-left font-medium text-slate-500">Revenue ratio</th>
-                <th className="px-3 py-2 text-left font-medium text-slate-500">Starts</th>
+                <th className="px-3 py-2 text-left font-medium text-slate-500">Break now</th>
+                <th className="px-3 py-2 text-left font-medium text-slate-500">Revenue now</th>
+                <th className="px-3 py-2 text-left font-medium text-slate-500">Dated changes</th>
                 <th className="px-3 py-2 text-left font-medium text-slate-500">Timezone</th>
                 <th className="px-3 py-2 text-left font-medium text-slate-500">Status</th>
                 <th className="px-3 py-2" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {displayedDivisions.map((d) => (
-                <tr key={d._id} className={d.active === false ? "bg-slate-50 opacity-75" : ""}>
+              {displayedDivisions.map((d) => {
+                const divisionHistory = historyForDivision(d._id);
+                const divisionToday = todayIso(d.timezone);
+                const currentThreshold = divisionHistory.find((entry) => thresholdDate(entry) <= divisionToday);
+                return (
+                <Fragment key={d._id}>
+                <tr className={d.active === false ? "bg-slate-50 opacity-75" : ""}>
                   <td className="px-3 py-2 font-medium text-slate-900">
                     <span className="block text-xs text-slate-400">{d.code}</span>
                     {isELT ? (
@@ -408,33 +476,23 @@ const SettingsPage = () => {
                     )}
                   </td>
                   <td className="px-3 py-2">
-                    <input
-                      type="number"
-                      disabled={d.active === false}
-                      value={d.thresholds?.breakMinutes ?? ""}
-                      onChange={(e) => handleDivisionThresholdChange(d._id, "breakMinutes", e.target.value)}
-                      className={inputClasses}
-                    />
+                    <span className="font-medium text-slate-800">{d.thresholds?.breakMinutes ?? "—"}</span>
+                    <span className="ml-1 text-xs text-slate-400">min</span>
                   </td>
                   <td className="px-3 py-2">
-                    <input
-                      type="number"
-                      step="0.01"
-                      disabled={d.active === false}
-                      value={d.thresholds?.revenueRatio ?? ""}
-                      onChange={(e) => handleDivisionThresholdChange(d._id, "revenueRatio", e.target.value)}
-                      className={inputClasses}
-                    />
+                    <span className="font-medium text-slate-800">{d.thresholds?.revenueRatio ?? "—"}</span>
                   </td>
                   <td className="px-3 py-2">
-                    <input
-                      type="date"
-                      aria-label={`Break minutes / revenue ratio start date for ${d.code}`}
-                      disabled={d.active === false}
-                      value={thresholdEffectiveDates[d._id] ?? todayIso()}
-                      onChange={(e) => handleThresholdEffectiveDateChange(d._id, e.target.value)}
-                      className="rounded-md border border-slate-300 px-2 py-1.5 text-sm disabled:bg-slate-100"
-                    />
+                    <button
+                      type="button"
+                      onClick={() => setExpandedThresholds((current) => ({
+                        ...current,
+                        [d._id]: !current[d._id],
+                      }))}
+                      className="text-xs font-medium text-brand-600 hover:underline"
+                    >
+                      {expandedThresholds[d._id] ? "Hide schedule" : `View schedule (${divisionHistory.length})`}
+                    </button>
                   </td>
                   <td className="px-3 py-2">
                     <select
@@ -490,7 +548,152 @@ const SettingsPage = () => {
                     </div>
                   </td>
                 </tr>
-              ))}
+                {expandedThresholds[d._id] && (
+                  <tr className={d.active === false ? "bg-slate-50" : "bg-slate-50/70"}>
+                    <td colSpan="7" className="px-4 py-4">
+                      <div className="mx-auto max-w-4xl">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div>
+                            <h3 className="text-sm font-semibold text-slate-900">
+                              Break and revenue schedule — {d.code}
+                            </h3>
+                            <p className="mt-1 text-xs text-slate-500">
+                              Past versions are locked. Add a new start date whenever the standard changes.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={d.active === false}
+                            onClick={() => openThresholdEditor(d)}
+                            className="rounded-md bg-brand-500 px-3 py-2 text-xs font-medium text-white hover:bg-brand-600 disabled:bg-slate-300"
+                          >
+                            Add change
+                          </button>
+                        </div>
+
+                        {thresholdDrafts[d._id] && (
+                          <div className="mt-4 grid items-end gap-3 rounded-lg border border-brand-200 bg-white p-4 sm:grid-cols-[1fr_1fr_1.2fr_auto_auto]">
+                            <label className="text-xs font-medium text-slate-600">
+                              Break minutes
+                              <input
+                                type="number"
+                                aria-label={`New break minutes for ${d.code}`}
+                                value={thresholdDrafts[d._id].breakMinutes}
+                                onChange={(event) => handleThresholdDraftChange(d._id, "breakMinutes", event.target.value)}
+                                className={`${inputClasses} mt-1 block w-full`}
+                              />
+                            </label>
+                            <label className="text-xs font-medium text-slate-600">
+                              Revenue ratio
+                              <input
+                                type="number"
+                                step="0.01"
+                                aria-label={`New revenue ratio for ${d.code}`}
+                                value={thresholdDrafts[d._id].revenueRatio}
+                                onChange={(event) => handleThresholdDraftChange(d._id, "revenueRatio", event.target.value)}
+                                className={`${inputClasses} mt-1 block w-full`}
+                              />
+                            </label>
+                            <label className="text-xs font-medium text-slate-600">
+                              Starts
+                              <input
+                                type="date"
+                                min={todayIso(d.timezone)}
+                                aria-label={`New settings start date for ${d.code}`}
+                                value={thresholdDrafts[d._id].effectiveDate}
+                                onChange={(event) => handleThresholdDraftChange(d._id, "effectiveDate", event.target.value)}
+                                className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              disabled={thresholdBusyId === d._id}
+                              onClick={() => handleThresholdSave(d)}
+                              className="rounded-md bg-brand-500 px-3 py-2 text-xs font-medium text-white hover:bg-brand-600 disabled:opacity-50"
+                            >
+                              {thresholdBusyId === d._id ? "Saving…" : "Save change"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setThresholdDrafts((current) => {
+                                const next = { ...current };
+                                delete next[d._id];
+                                return next;
+                              })}
+                              className="px-2 py-2 text-xs font-medium text-slate-500 hover:underline"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        )}
+
+                        <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white">
+                          {divisionHistory.length ? (
+                            <table className="min-w-full divide-y divide-slate-200 text-xs">
+                              <thead className="bg-slate-50 text-slate-500">
+                                <tr>
+                                  <th className="px-3 py-2 text-left font-medium">Starts</th>
+                                  <th className="px-3 py-2 text-left font-medium">Break minutes</th>
+                                  <th className="px-3 py-2 text-left font-medium">Revenue ratio</th>
+                                  <th className="px-3 py-2 text-left font-medium">State</th>
+                                  <th className="px-3 py-2" />
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {divisionHistory.map((entry) => {
+                                  const startDate = thresholdDate(entry);
+                                  const isPast = startDate < divisionToday;
+                                  const isCurrent = currentThreshold && (
+                                    String(currentThreshold._id || thresholdDate(currentThreshold)) ===
+                                    String(entry._id || startDate)
+                                  );
+                                  const state = isCurrent ? "Current" : isPast ? "Past" : "Scheduled";
+                                  return (
+                                    <tr key={entry._id || `${d._id}-${startDate}`}>
+                                      <td className="px-3 py-2 text-slate-700">{startDate}</td>
+                                      <td className="px-3 py-2 text-slate-700">{entry.breakMinutes}</td>
+                                      <td className="px-3 py-2 text-slate-700">{entry.revenueRatio}</td>
+                                      <td className="px-3 py-2">
+                                        <span className={`rounded-full px-2 py-0.5 font-medium ${
+                                          isCurrent
+                                            ? "bg-emerald-50 text-emerald-700"
+                                            : isPast
+                                              ? "bg-slate-100 text-slate-500"
+                                              : "bg-blue-50 text-blue-700"
+                                        }`}>
+                                          {state}
+                                        </span>
+                                      </td>
+                                      <td className="px-3 py-2 text-right">
+                                        {!isPast && d.active !== false && (
+                                          <button
+                                            type="button"
+                                            aria-label={`Edit settings starting ${startDate} for ${d.code}`}
+                                            onClick={() => openThresholdEditor(d, entry)}
+                                            className="font-medium text-brand-600 hover:underline"
+                                          >
+                                            Edit
+                                          </button>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          ) : (
+                            <p className="px-4 py-3 text-xs text-slate-500">
+                              No dated versions yet. The current values will be preserved as the original version when you add the first change.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>
