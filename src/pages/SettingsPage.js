@@ -7,6 +7,21 @@ import { TIMEZONES } from "../utils/dates";
 const inputClasses =
   "w-24 rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500";
 
+const retentionDefaults = {
+  enabled: false,
+  operationalHistory: { value: 7, unit: "years" },
+  auditLogs: { value: 7, unit: "years" },
+  teamPosts: { value: 3, unit: "years" },
+  networkSubmissionStaging: { value: 1, unit: "years" },
+};
+
+const retentionRows = [
+  ["operationalHistory", "Operational History"],
+  ["auditLogs", "Audit Logs"],
+  ["teamPosts", "Team Posts"],
+  ["networkSubmissionStaging", "Network Submission Staging"],
+];
+
 const thisMonth = () => {
   const date = new Date();
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 7);
@@ -173,6 +188,43 @@ const SettingsPage = () => {
         osrAdvanceDays: Number(settings.osrAdvanceDays ?? 7),
         scheduleHistoryLookbackWeeks: Number(settings.scheduleHistoryLookbackWeeks ?? 6),
         operationsReportingStartMonth: settings.operationsReportingStartMonth,
+      });
+      setSettings(data.settings);
+      flashSaved();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const retention = settings?.dataRetention || retentionDefaults;
+
+  const handleRetentionChange = (key, field, value) => {
+    setSettings((current) => ({
+      ...current,
+      dataRetention: {
+        ...retentionDefaults,
+        ...current.dataRetention,
+        [key]: {
+          ...retentionDefaults[key],
+          ...current.dataRetention?.[key],
+          [field]: value,
+        },
+      },
+    }));
+  };
+
+  const handleRetentionSave = async (event) => {
+    event.preventDefault();
+    setError("");
+    try {
+      const data = await apiPut("/api/settings", {
+        dataRetention: {
+          enabled: Boolean(retention.enabled),
+          ...Object.fromEntries(retentionRows.map(([key]) => [key, {
+            value: Number(retention[key]?.value ?? retentionDefaults[key].value),
+            unit: retention[key]?.unit || retentionDefaults[key].unit,
+          }])),
+        },
       });
       setSettings(data.settings);
       flashSaved();
@@ -434,6 +486,69 @@ const SettingsPage = () => {
           )}
         </form>
       </div>
+
+      {isELT && (
+        <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6">
+          <h2 className="text-sm font-semibold text-slate-900">Data Retention</h2>
+          <p className="mt-1 text-xs text-slate-500">
+            Automatic cleanup applies only to historical, log, post, and upload-staging data. Master and current operational records are excluded.
+          </p>
+          <form onSubmit={handleRetentionSave} className="mt-4">
+            <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              <input
+                type="checkbox"
+                checked={Boolean(retention.enabled)}
+                onChange={(event) => setSettings((current) => ({
+                  ...current,
+                  dataRetention: { ...retentionDefaults, ...current.dataRetention, enabled: event.target.checked },
+                }))}
+              />
+              Enable automatic retention
+            </label>
+            <div className="mt-5 grid gap-4 lg:grid-cols-2">
+              {retentionRows.map(([key, label]) => {
+                const policy = retention[key] || retentionDefaults[key];
+                const indefinite = policy.unit === "indefinite";
+                return (
+                  <div key={key} className="rounded-lg border border-slate-200 p-4">
+                    <p className="text-sm font-medium text-slate-700">{label}</p>
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        aria-label={`${label} retention value`}
+                        type="number"
+                        min="1"
+                        max="10000"
+                        step="1"
+                        disabled={indefinite}
+                        value={policy.value}
+                        onChange={(event) => handleRetentionChange(key, "value", event.target.value)}
+                        className={`${inputClasses} disabled:bg-slate-100`}
+                      />
+                      <select
+                        aria-label={`${label} retention unit`}
+                        value={policy.unit}
+                        onChange={(event) => handleRetentionChange(key, "unit", event.target.value)}
+                        className="rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+                      >
+                        <option value="days">Days</option>
+                        <option value="months">Months</option>
+                        <option value="years">Years</option>
+                        <option value="indefinite">Retain Indefinitely</option>
+                      </select>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <button
+              type="submit"
+              className="mt-5 rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
+            >
+              Save Settings
+            </button>
+          </form>
+        </div>
+      )}
 
       <div className="rounded-xl border border-slate-200 bg-white p-6">
         <h2 className="mb-2 text-sm font-semibold text-slate-900">Division settings and lifecycle</h2>

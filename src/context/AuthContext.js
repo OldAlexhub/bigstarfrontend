@@ -3,8 +3,6 @@ import {
   apiGet,
   apiPost,
   AUTH_UNAUTHORIZED_EVENT,
-  clearAuthToken,
-  setAuthToken,
 } from "../api/client";
 
 const AuthContext = createContext(null);
@@ -54,7 +52,6 @@ export const AuthProvider = ({ children }) => {
           : "Couldn't reach the server. Check your connection and try again."
       );
     }
-    setAuthToken(data.token);
     setUser(data.user);
     return data.user;
   }, []);
@@ -63,7 +60,6 @@ export const AuthProvider = ({ children }) => {
     try {
       await apiPost("/api/auth/logout");
     } finally {
-      clearAuthToken();
       setUser(null);
     }
   }, []);

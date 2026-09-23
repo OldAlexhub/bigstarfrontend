@@ -4,54 +4,28 @@
 export const API_BASE = import.meta.env.DEV ? "" : import.meta.env.REACT_APP_API_URL || "";
 
 export const AUTH_UNAUTHORIZED_EVENT = "bigstar:unauthorized";
-export const AUTH_TOKEN_STORAGE_KEY = "bigstar.authToken";
+const LEGACY_AUTH_TOKEN_STORAGE_KEY = "bigstar.authToken";
 
-let memoryAuthToken = null;
-
-const sessionStorageOrNull = () => {
-  if (typeof window === "undefined") return null;
-  try {
-    return window.sessionStorage;
-  } catch {
-    return null;
-  }
+// Authentication is cookie-only. Remove tokens left by older client builds
+// without ever reading or forwarding them to application JavaScript.
+const clearLegacyAuthStorage = () => {
+  if (typeof window === "undefined") return;
+  try { window.sessionStorage?.removeItem(LEGACY_AUTH_TOKEN_STORAGE_KEY); } catch {}
+  try { window.localStorage?.removeItem(LEGACY_AUTH_TOKEN_STORAGE_KEY); } catch {}
 };
-
-export const getAuthToken = () => {
-  try {
-    return sessionStorageOrNull()?.getItem(AUTH_TOKEN_STORAGE_KEY) || memoryAuthToken;
-  } catch {
-    return memoryAuthToken;
-  }
-};
-
-export const setAuthToken = (token) => {
-  memoryAuthToken = token || null;
-  try {
-    const storage = sessionStorageOrNull();
-    if (token) storage?.setItem(AUTH_TOKEN_STORAGE_KEY, token);
-    else storage?.removeItem(AUTH_TOKEN_STORAGE_KEY);
-  } catch {
-    // The in-memory copy still supports browsers where storage is unavailable.
-  }
-};
-
-export const clearAuthToken = () => setAuthToken(null);
 
 const reportUnauthorized = () => {
-  clearAuthToken();
+  clearLegacyAuthStorage();
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT));
   }
 };
 
 const request = async (path, options = {}) => {
+  clearLegacyAuthStorage();
   const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
   const headers = new Headers(options.headers);
   if (!isFormData && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
-
-  const token = getAuthToken();
-  if (token && !headers.has("Authorization")) headers.set("Authorization", `Bearer ${token}`);
 
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
@@ -84,9 +58,8 @@ export const apiDelete = (path, body) => request(path, {
 });
 
 export const apiDownload = async (path) => {
+  clearLegacyAuthStorage();
   const headers = new Headers();
-  const token = getAuthToken();
-  if (token) headers.set("Authorization", `Bearer ${token}`);
 
   const res = await fetch(`${API_BASE}${path}`, {
     credentials: "include",

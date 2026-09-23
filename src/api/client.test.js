@@ -2,9 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   apiGet,
   AUTH_UNAUTHORIZED_EVENT,
-  clearAuthToken,
-  getAuthToken,
-  setAuthToken,
 } from "./client";
 
 const response = ({ ok = true, status = 200, data = {} } = {}) => ({
@@ -15,28 +12,31 @@ const response = ({ ok = true, status = 200, data = {} } = {}) => ({
 
 describe("API authentication", () => {
   beforeEach(() => {
-    clearAuthToken();
+    window.sessionStorage.clear();
+    window.localStorage.clear();
     global.fetch = vi.fn();
   });
 
   afterEach(() => {
-    clearAuthToken();
     vi.restoreAllMocks();
   });
 
-  it("sends the session token with protected requests while retaining cookies", async () => {
-    setAuthToken("session-token");
+  it("uses cookie authentication without storing or sending a browser-readable JWT", async () => {
+    window.sessionStorage.setItem("bigstar.authToken", "legacy-session-token");
+    window.localStorage.setItem("bigstar.authToken", "legacy-local-token");
     fetch.mockResolvedValue(response({ data: { ok: true } }));
 
     await apiGet("/api/example");
 
     const [, options] = fetch.mock.calls[0];
     expect(options.credentials).toBe("include");
-    expect(options.headers.get("Authorization")).toBe("Bearer session-token");
+    expect(options.headers.get("Authorization")).toBeNull();
+    expect(window.sessionStorage.getItem("bigstar.authToken")).toBeNull();
+    expect(window.localStorage.getItem("bigstar.authToken")).toBeNull();
   });
 
   it("clears a rejected session and reports it to the auth provider", async () => {
-    setAuthToken("expired-token");
+    window.sessionStorage.setItem("bigstar.authToken", "expired-token");
     fetch.mockResolvedValue(response({ ok: false, status: 401, data: { message: "Not authenticated" } }));
     const listener = vi.fn();
     window.addEventListener(AUTH_UNAUTHORIZED_EVENT, listener);
@@ -46,7 +46,7 @@ describe("API authentication", () => {
       status: 401,
     });
 
-    expect(getAuthToken()).toBeNull();
+    expect(window.sessionStorage.getItem("bigstar.authToken")).toBeNull();
     expect(listener).toHaveBeenCalledOnce();
     window.removeEventListener(AUTH_UNAUTHORIZED_EVENT, listener);
   });

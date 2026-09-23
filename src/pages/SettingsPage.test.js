@@ -46,6 +46,13 @@ describe("division lifecycle settings", () => {
           settings: {
             osrAdvanceDays: 7,
             operationsReportingStartMonth: "2026-01",
+            dataRetention: {
+              enabled: false,
+              operationalHistory: { value: 7, unit: "years" },
+              auditLogs: { value: 7, unit: "years" },
+              teamPosts: { value: 3, unit: "years" },
+              networkSubmissionStaging: { value: 1, unit: "years" },
+            },
           },
         });
       }
@@ -235,6 +242,39 @@ describe("division lifecycle settings", () => {
         expect.objectContaining({ scheduleHistoryLookbackWeeks: 5 })
       )
     );
+  });
+
+  test("ELT can enable and save the four retention policies", async () => {
+    apiPut.mockResolvedValue({
+      settings: {
+        osrAdvanceDays: 7,
+        scheduleHistoryLookbackWeeks: 6,
+        operationsReportingStartMonth: "2026-01",
+        dataRetention: {
+          enabled: true,
+          operationalHistory: { value: 7, unit: "years" },
+          auditLogs: { value: 7, unit: "years" },
+          teamPosts: { value: 6, unit: "months" },
+          networkSubmissionStaging: { value: 1, unit: "indefinite" },
+        },
+      },
+    });
+    render(<MemoryRouter><SettingsPage /></MemoryRouter>);
+
+    await screen.findByDisplayValue("Division One");
+    fireEvent.click(screen.getByLabelText("Enable automatic retention"));
+    fireEvent.change(screen.getByLabelText("Team Posts retention value"), { target: { value: "6" } });
+    fireEvent.change(screen.getByLabelText("Team Posts retention unit"), { target: { value: "months" } });
+    fireEvent.change(screen.getByLabelText("Network Submission Staging retention unit"), { target: { value: "indefinite" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Settings" }));
+
+    await waitFor(() => expect(apiPut).toHaveBeenCalledWith("/api/settings", {
+      dataRetention: expect.objectContaining({
+        enabled: true,
+        teamPosts: { value: 6, unit: "months" },
+        networkSubmissionStaging: { value: 1, unit: "indefinite" },
+      }),
+    }));
   });
 
   test("a division's standby coverage and pullout address rules can be turned on and saved", async () => {
