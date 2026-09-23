@@ -211,6 +211,31 @@ test("Spare submissions accept a single CSV file and reject other extensions", a
   expect(form.get("spare").name).toBe("duty-performance.csv");
 });
 
+test("RideCo submissions require and upload both workbooks", async () => {
+  apiGet.mockResolvedValue({ submissions: [] });
+  apiFormPost.mockResolvedValue({ submission: { ...pending, source: "rideco" } });
+
+  const { container } = render(<ExcelSubmissions />);
+  fireEvent.click(await screen.findByRole("button", { name: /RideCo/ }));
+  expect(screen.getByText("Shift Hours Mileage")).toBeInTheDocument();
+  expect(screen.getByText("OTP Report")).toBeInTheDocument();
+
+  const inputs = container.querySelectorAll('input[type="file"]');
+  expect(inputs).toHaveLength(2);
+  const hours = new File(["hours"], "shift-hours.xlsx", { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const otp = new File(["otp"], "otp-report.xlsx", { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  fireEvent.change(inputs[0], { target: { files: [hours] } });
+  expect(screen.getByRole("button", { name: "Continue to matching" })).toBeDisabled();
+  fireEvent.change(inputs[1], { target: { files: [otp] } });
+  fireEvent.click(screen.getByRole("button", { name: "Continue to matching" }));
+
+  await waitFor(() => expect(apiFormPost).toHaveBeenCalled());
+  const [, form] = apiFormPost.mock.calls[0];
+  expect(form.get("source")).toBe("rideco");
+  expect(form.get("ridecoHours").name).toBe("shift-hours.xlsx");
+  expect(form.get("ridecoOtp").name).toBe("otp-report.xlsx");
+});
+
 test("recent submissions paginate three records per view", async () => {
   const submissions = Array.from({ length: 7 }, (_, index) => ({
     id: `submission-${index + 1}`,

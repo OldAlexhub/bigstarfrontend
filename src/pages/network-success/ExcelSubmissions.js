@@ -23,6 +23,14 @@ const sources = {
     description: "Daily Duty Performance report",
     files: [{ key: "spare", label: "Daily Duty Performance", hint: "One .csv file", extensions: [".csv"] }],
   },
+  rideco: {
+    label: "RideCo",
+    description: "Shift hours plus OTP by shift",
+    files: [
+      { key: "ridecoHours", label: "Shift Hours Mileage", hint: "Required", extensions: [".xls", ".xlsx"] },
+      { key: "ridecoOtp", label: "OTP Report", hint: "Required", extensions: [".xls", ".xlsx"] },
+    ],
+  },
 };
 
 const extensionPattern = (extensions) =>
@@ -107,6 +115,8 @@ const RowDetails = ({ row }) => {
           <div className="flex justify-between gap-4"><dt>Revenue hours</dt><dd>{metric(row.reportedRevenueHours)}</dd></div>
           <div className="flex justify-between gap-4"><dt>TPSH</dt><dd>{metric(row.tpsh)}</dd></div>
           <div className="flex justify-between gap-4"><dt>OTP</dt><dd>{pct(row.otpPct)}</dd></div>
+          {Number.isFinite(row.pickupOtpPct) && <div className="flex justify-between gap-4"><dt>Pickup OTP</dt><dd>{pct(row.pickupOtpPct)}</dd></div>}
+          {Number.isFinite(row.dropoffOtpPct) && <div className="flex justify-between gap-4"><dt>Dropoff OTP</dt><dd>{pct(row.dropoffOtpPct)}</dd></div>}
         </dl>
       </div>
       <div>
@@ -621,7 +631,7 @@ const ExcelSubmissions = () => {
               <h2 className="text-lg font-semibold text-slate-900">Choose the source system</h2>
               <p className="mt-1 text-sm text-slate-500">Files are parsed for review; workbook binaries are never retained.</p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {Object.entries(sources).map(([key, option]) => (
                 <button
                   key={key}

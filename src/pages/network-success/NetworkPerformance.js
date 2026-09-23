@@ -189,6 +189,7 @@ const NetworkPerformance = () => {
               <option value="vision">Vision</option>
               <option value="ecolane">Ecolane</option>
               <option value="spare">Spare</option>
+              <option value="rideco">RideCo</option>
             </select>
           </label>
           {analysis?.hasProviderData && (
