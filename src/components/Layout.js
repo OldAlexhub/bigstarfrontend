@@ -1,5 +1,6 @@
 import { Outlet } from "react-router-dom";
 import Navbar from "./Navbar";
+import CompassOwnership from "./CompassOwnership";
 
 const Layout = () => (
   <div className="flex min-h-screen flex-col bg-slate-50">
@@ -8,7 +9,7 @@ const Layout = () => (
       <Outlet />
     </main>
     <footer className="border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-500 print:hidden">
-      &copy; {new Date().getFullYear()} Big Star Transit LLC
+      <CompassOwnership />
     </footer>
   </div>
 );

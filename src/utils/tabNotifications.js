@@ -1,4 +1,4 @@
-const BASE_TITLE = typeof document !== "undefined" ? document.title : "Big Star Transit LLC";
+const BASE_TITLE = typeof document !== "undefined" ? document.title : "COMPASS | Big Star Transit LLC";
 const BASE_FAVICON =
   (typeof document !== "undefined" && document.querySelector('link[rel="icon"]')?.getAttribute("href")) ||
   "/logo.png";

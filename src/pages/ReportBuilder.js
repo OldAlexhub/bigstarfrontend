@@ -394,7 +394,7 @@ const ReportBuilder = () => {
     setDownloading(format);
     setError("");
     try {
-      const params = queryFor(appliedConfig, { format, title: config.title.trim() || "BigStar Report" });
+      const params = queryFor(appliedConfig, { format, title: config.title.trim() || "COMPASS Report" });
       const file = await apiDownload(`/api/report-builder/export?${params}`);
       downloadBlob(file);
     } catch (err) {

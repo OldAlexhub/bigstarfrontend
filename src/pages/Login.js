@@ -5,6 +5,7 @@ import logo from "../assets/logo.png";
 import teamPortrait from "../assets/0azJCkAQ-scaled-portrait-3baef0d59dcee84ff955aa25eebf617a-yxz3f84okjwv.jpeg";
 import sloganBanner from "../assets/bigstar-linkedin-hero5.jpg";
 import { firstAccessiblePath } from "../config/pageAccess";
+import CompassOwnership from "../components/CompassOwnership";
 
 const Login = () => {
   const { user, login } = useAuth();
@@ -53,8 +54,12 @@ const Login = () => {
         <div className="flex flex-1 items-center justify-center">
           <div className="w-full max-w-sm">
             <div className="mb-7 text-center">
-              <img src={logo} alt="Big Star Transit" className="mx-auto h-auto w-full max-w-[280px]" />
-              <p className="mt-3 text-sm text-slate-500">Sign in to continue</p>
+              <img
+                src={logo}
+                alt="COMPASS — Align. Measure. Improve."
+                className="mx-auto h-auto w-full max-w-[320px]"
+              />
+              <p className="mt-3 text-sm text-slate-500">Sign in to COMPASS</p>
             </div>
             <form
               onSubmit={handleSubmit}
@@ -107,7 +112,7 @@ const Login = () => {
           </div>
         </div>
         <p className="pt-6 text-center text-xs text-slate-400">
-          &copy; {new Date().getFullYear()} Big Star Transit LLC
+          <CompassOwnership />
         </p>
       </section>
     </div>
